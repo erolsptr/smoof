@@ -15,7 +15,7 @@ export default function ProfileScreen() {
   const clearUserData = useUserStore((state) => state.clearUserData);
   const currentStreak = useStatsStore((state) => state.currentStreak);
   const clearStatsData = useStatsStore((state) => state.clearStatsData);
-  const calculateStreak = useStatsStore((state) => state.calculateStreak);
+  const updateStreakFromQuitDate = useStatsStore((state) => state.updateStreakFromQuitDate);
 
   if (!profile) {
     return (
@@ -33,8 +33,8 @@ export default function ProfileScreen() {
 
     await updateProfile({ quitDate: newQuitDate });
     
-    // Recalculate streak
-    calculateStreak();
+    // Recalculate streak from new quit date
+    updateStreakFromQuitDate(newQuitDate);
     
     Alert.alert(
       'Tarih Güncellendi',

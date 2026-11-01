@@ -17,18 +17,16 @@ export default function HomeScreen() {
   
   const [activeCard, setActiveCard] = useState(0);
 
-  // Calculate real stats from profile
+  // Calculate real stats from profile and keep streak synced
   useEffect(() => {
-    if (profile) {
-      // Recalculate streak from quit date
+    if (profile?.quitDate) {
       const streakDays = calculateStreakFromQuitDate(profile.quitDate);
       // Always ensure store has correct streak
       if (currentStreak !== streakDays) {
-        // Update directly without waiting
-        useStatsStore.setState({ currentStreak: streakDays });
+        useStatsStore.getState().updateStreakFromQuitDate(profile.quitDate);
       }
     }
-  }, [profile?.quitDate]);
+  }, [profile?.quitDate, currentStreak]);
 
   // Calculate real stats
   const cigarettesNotSmoked = profile 

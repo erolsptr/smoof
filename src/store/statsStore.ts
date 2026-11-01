@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { storage, STORAGE_KEYS } from '@/utils/storage';
+import { calculateStreakFromQuitDate } from '@/utils/dateHelpers';
 import type { DailyStats, CrisisLog } from '@/types';
 
 interface StatsState {
@@ -11,7 +12,7 @@ interface StatsState {
   // Actions
   logCrisis: (log: Omit<CrisisLog, 'id'>) => Promise<void>;
   updateDailyStats: (date: string, updates: Partial<DailyStats>) => Promise<void>;
-  calculateStreak: () => void;
+  updateStreakFromQuitDate: (quitDate: string) => void;
   recordSlip: (cigarettesSmoked: number) => Promise<void>;
   loadStatsData: () => Promise<void>;
   clearStatsData: () => Promise<void>;
@@ -58,42 +59,14 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     
     set({ dailyStats: updatedStats });
     await storage.setItem(STORAGE_KEYS.DAILY_STATS, updatedStats);
-    
-    // Recalculate streak after stats update
-    get().calculateStreak();
   },
   
-  calculateStreak: () => {
-    const { dailyStats } = get();
-    // Sort by date descending
-    const sorted = [...dailyStats].sort((a, b) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-    
-    let currentStreak = 0;
-    let longestStreak = 0;
-    let tempStreak = 0;
-    
-    // Calculate current streak (from today backwards)
-    for (const stat of sorted) {
-      if (stat.smokeFree) {
-        currentStreak++;
-      } else {
-        break;
-      }
-    }
-    
-    // Calculate longest streak
-    for (const stat of dailyStats) {
-      if (stat.smokeFree) {
-        tempStreak++;
-        longestStreak = Math.max(longestStreak, tempStreak);
-      } else {
-        tempStreak = 0;
-      }
-    }
-    
-    set({ currentStreak, longestStreak: Math.max(longestStreak, currentStreak) });
+  updateStreakFromQuitDate: (quitDate: string) => {
+    const streakDays = calculateStreakFromQuitDate(quitDate);
+    set({ 
+      currentStreak: streakDays,
+      longestStreak: Math.max(get().longestStreak, streakDays),
+    });
   },
   
   recordSlip: async (cigarettesSmoked) => {
@@ -115,9 +88,6 @@ export const useStatsStore = create<StatsState>((set, get) => ({
         dailyStats: dailyStats ?? [],
         crisisLogs: crisisLogs ?? [],
       });
-      
-      // Calculate streak after loading
-      get().calculateStreak();
     } catch (error) {
       console.error('Error loading stats data:', error);
     }
