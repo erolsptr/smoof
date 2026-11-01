@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useUserStore } from '@/store/userStore';
 import { useStatsStore } from '@/store/statsStore';
@@ -12,6 +13,7 @@ import { useState, useEffect } from 'react';
  */
 export default function HomeScreen() {
   const { colors } = useColorScheme();
+  const router = useRouter();
   const profile = useUserStore((state) => state.profile);
   const currentStreak = useStatsStore((state) => state.currentStreak);
   
@@ -144,6 +146,7 @@ export default function HomeScreen() {
       <TouchableOpacity
         style={[styles.crisisButton, { backgroundColor: colors.error }]}
         activeOpacity={0.8}
+        onPress={() => router.push('/crisis')}
       >
         <Text style={styles.crisisText}>🆘 Sigara İçmek İstiyorum</Text>
       </TouchableOpacity>
