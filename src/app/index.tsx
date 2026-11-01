@@ -2,26 +2,37 @@ import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { Redirect } from 'expo-router';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useUserStore } from '@/store/userStore';
+import { useStatsStore } from '@/store/statsStore';
 import { useEffect, useState } from 'react';
 
 /**
  * Splash / Router Screen
- * Decides where to navigate: onboarding or main app
+ * Loads user data and decides where to navigate
  */
 export default function IndexScreen() {
   const { colors } = useColorScheme();
   const isOnboarded = useUserStore((state) => state.isOnboarded);
-  const [isLoading, setIsLoading] = useState(true);
+  const isLoading = useUserStore((state) => state.isLoading);
+  const loadUserData = useUserStore((state) => state.loadUserData);
+  const loadStatsData = useStatsStore((state) => state.loadStatsData);
+  
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    // TODO: Load user data from AsyncStorage/SQLite
-    // For now, simulate loading
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 1000);
+    async function initializeApp() {
+      // Load all persisted data
+      await Promise.all([
+        loadUserData(),
+        loadStatsData(),
+      ]);
+      
+      setIsInitialized(true);
+    }
+    
+    initializeApp();
   }, []);
 
-  if (isLoading) {
+  if (!isInitialized || isLoading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.primary }]}>
         <Text style={styles.logo}>🦎</Text>

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "dependencies": {
-    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-async-storage/async-storage": "^2.2.0",
     "expo": "~58.0.22",
     "expo-constants": "~58.0.14",
     "expo-linking": "~58.0.15",
@@ -16,7 +16,8 @@
     "react-native-reanimated": "4.7.1",
     "react-native-safe-area-context": "~5.10.1",
     "react-native-screens": "~4.30.1",
-    "zustand": "^5.0.16"
+    "zustand": "^5.0.16",
+    "zustand-persist": "^0.4.0"
   },
   "devDependencies": {
     "@types/react": "~19.3.0",

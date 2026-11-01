@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useOnboardingStore } from '@/store/onboardingStore';
 import { Spacing, Typography, BorderRadius } from '@/constants';
 import type { QuitMethod } from '@/types';
 
@@ -17,6 +18,7 @@ export default function OnboardingStep2() {
 
   const handleContinue = () => {
     if (selected) {
+      useOnboardingStore.getState().setStep2Data(selected);
       router.push('/onboarding/step3');
     }
   };

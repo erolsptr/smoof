@@ -13,6 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useState, useRef } from 'react';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useOnboardingStore } from '@/store/onboardingStore';
 import { Spacing, Typography, BorderRadius } from '@/constants';
 
 /**
@@ -33,9 +34,14 @@ export default function OnboardingStep1() {
   const canContinue = dailyCigarettes.length > 0 && packPrice.length > 0;
 
   const handleContinue = () => {
-    Keyboard.dismiss(); // Klavyeyi kapat
+    Keyboard.dismiss();
     if (canContinue) {
-      // TODO: Store in temp state or pass via params
+      const dailyCount = parseInt(dailyCigarettes, 10);
+      const price = parseFloat(packPrice);
+      
+      // Store in onboarding store
+      useOnboardingStore.getState().setStep1Data(dailyCount, price);
+      
       router.push('/onboarding/step2');
     }
   };

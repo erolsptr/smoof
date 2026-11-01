@@ -2,8 +2,9 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useUserStore } from '@/store/userStore';
 import { useStatsStore } from '@/store/statsStore';
+import { calculateStreakFromQuitDate } from '@/utils/dateHelpers';
 import { Spacing, Typography, BorderRadius } from '@/constants';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 /**
  * Home Screen - Dashboard
@@ -16,12 +17,57 @@ export default function HomeScreen() {
   
   const [activeCard, setActiveCard] = useState(0);
 
-  // Sample stats for demo
+  // Calculate real stats from profile
+  useEffect(() => {
+    if (profile) {
+      // Recalculate streak from quit date
+      const streakDays = calculateStreakFromQuitDate(profile.quitDate);
+      // Update store if needed
+      if (streakDays !== currentStreak) {
+        useStatsStore.getState().calculateStreak();
+      }
+    }
+  }, [profile]);
+
+  // Calculate real stats
+  const cigarettesNotSmoked = profile 
+    ? currentStreak * profile.dailyCigaretteCount 
+    : 0;
+    
+  const moneySaved = profile
+    ? (cigarettesNotSmoked / profile.cigarettesPerPack) * profile.packPrice
+    : 0;
+    
+  const timeSavedMinutes = cigarettesNotSmoked * 5; // 5 min per cigarette
+  const timeSavedHours = Math.floor(timeSavedMinutes / 60);
+
   const stats = [
-    { label: 'İçilmeyen Sigara', value: currentStreak * 10, icon: '🚭' },
-    { label: 'Para Tasarrufu', value: `₺${(currentStreak * 45 / 2).toFixed(0)}`, icon: '💰' },
-    { label: 'Sağlık İlerlemesi', value: '%87', icon: '💪' },
+    { 
+      label: 'İçilmeyen Sigara', 
+      value: cigarettesNotSmoked.toLocaleString('tr-TR'), 
+      icon: '🚭' 
+    },
+    { 
+      label: 'Para Tasarrufu', 
+      value: `₺${moneySaved.toFixed(0)}`, 
+      icon: '💰' 
+    },
+    { 
+      label: 'Kazanılan Zaman', 
+      value: `${timeSavedHours} saat`, 
+      icon: '⏱️' 
+    },
   ];
+
+  // Motivational message based on streak
+  const getMotivationalMessage = () => {
+    if (currentStreak === 0) return 'İlk günün! Başarırsın 💪';
+    if (currentStreak === 1) return 'İlk gün tamamlandı! 🎉';
+    if (currentStreak < 7) return 'Harika gidiyorsun! Devam et 💪';
+    if (currentStreak < 30) return 'Süpersin! İlerleme harika 🌟';
+    if (currentStreak < 90) return 'İnanılmaz! Gurur duymalısın 🏆';
+    return 'Efsanesin! Ne kadar güçlüsün 👑';
+  };
 
   return (
     <ScrollView 
@@ -44,7 +90,7 @@ export default function HomeScreen() {
           <Text style={styles.streakFire}>🔥</Text>
         </View>
         <Text style={styles.streakSubtext}>
-          Harika gidiyorsun! Devam et 💪
+          {getMotivationalMessage()}
         </Text>
       </View>
 
@@ -116,7 +162,7 @@ export default function HomeScreen() {
             <Text style={styles.quickIcon}>⏱️</Text>
             <Text style={[styles.quickText, { color: colors.textSecondary }]}>
               Tasarruf edilen zaman: <Text style={[styles.quickValue, { color: colors.text }]}>
-                {Math.floor(currentStreak * 10 * 5 / 60)} saat
+                {timeSavedHours} saat
               </Text>
             </Text>
           </View>
@@ -124,7 +170,7 @@ export default function HomeScreen() {
             <Text style={styles.quickIcon}>❤️</Text>
             <Text style={[styles.quickText, { color: colors.textSecondary }]}>
               Kalp sağlığı: <Text style={[styles.quickValue, { color: colors.success }]}>
-                İyileşiyor
+                {currentStreak > 0 ? 'İyileşiyor' : 'Başlamaya hazır'}
               </Text>
             </Text>
           </View>

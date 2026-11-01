@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useUserStore } from '@/store/userStore';
 import { useStatsStore } from '@/store/statsStore';
+import { useOnboardingStore } from '@/store/onboardingStore';
+import { getTodayString } from '@/utils/dateHelpers';
 import { Spacing, Typography, BorderRadius } from '@/constants';
 
 /**
@@ -18,27 +20,50 @@ export default function OnboardingStep3() {
   
   const [selected, setSelected] = useState<'today' | 'custom' | null>(null);
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     if (!selected) return;
 
-    // TODO: Get data from previous steps (use context or store)
-    // For now, create a demo profile
+    // Get onboarding data
+    const onboardingData = useOnboardingStore.getState().getCompleteData();
+    
+    if (!onboardingData) {
+      console.error('Incomplete onboarding data');
+      return;
+    }
+
+    // Determine quit date
+    const quitDate = selected === 'today' 
+      ? getTodayString()
+      : getTodayString(); // TODO: Let user select custom date
+
+    // Create user profile
     const profile = {
-      id: 'user_1',
+      id: `user_${Date.now()}`,
       createdAt: new Date().toISOString(),
-      dailyCigaretteCount: 10,
-      packPrice: 45,
+      dailyCigaretteCount: onboardingData.dailyCigarettes,
+      packPrice: onboardingData.packPrice,
       cigarettesPerPack: 20,
-      quitDate: new Date().toISOString(),
-      quitMethod: 'cold-turkey' as const,
+      quitDate,
+      quitMethod: onboardingData.quitMethod,
       triggers: [],
       motivations: [],
       streakFreezes: 2, // Weekly allowance
       streakFreezesUsed: 0,
     };
 
-    setProfile(profile);
-    completeOnboarding();
+    // Save profile
+    await setProfile(profile);
+    
+    // Initialize first day stats
+    await useStatsStore.getState().updateDailyStats(quitDate, {
+      smokeFree: true,
+      cigarettesSmoked: 0,
+      cravingsLogged: 0,
+      crisesHandled: 0,
+    });
+    
+    // Clear onboarding temp data
+    useOnboardingStore.getState().clearData();
     
     // Navigate to main app
     router.replace('/(tabs)');
