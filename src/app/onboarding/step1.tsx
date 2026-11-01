@@ -1,6 +1,17 @@
-import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  TextInput, 
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
+  ScrollView
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Spacing, Typography, BorderRadius } from '@/constants';
 
@@ -15,93 +26,122 @@ export default function OnboardingStep1() {
   
   const [dailyCigarettes, setDailyCigarettes] = useState('');
   const [packPrice, setPackPrice] = useState('');
+  
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const packPriceInputRef = useRef<any>(null);
 
   const canContinue = dailyCigarettes.length > 0 && packPrice.length > 0;
 
   const handleContinue = () => {
+    Keyboard.dismiss(); // Klavyeyi kapat
     if (canContinue) {
       // TODO: Store in temp state or pass via params
       router.push('/onboarding/step2');
     }
   };
 
+  const dismissKeyboard = () => {
+    Keyboard.dismiss();
+  };
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Progress indicator */}
-      <View style={styles.progress}>
-        <View style={[styles.progressDot, { backgroundColor: colors.primary }]} />
-        <View style={[styles.progressDot, { backgroundColor: colors.cardBorder }]} />
-        <View style={[styles.progressDot, { backgroundColor: colors.cardBorder }]} />
-      </View>
-
-      <View style={styles.content}>
-        <Text style={styles.mascot}>🦎</Text>
-        
-        <Text style={[styles.title, { color: colors.text }]}>
-          Önce birkaç şey öğrenelim
-        </Text>
-        
-        <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.textSecondary }]}>
-              Günde kaç sigara içiyorsun?
-            </Text>
-            <TextInput
-              style={[styles.input, { 
-                backgroundColor: colors.card, 
-                borderColor: colors.cardBorder,
-                color: colors.text,
-              }]}
-              placeholder="Örn: 10"
-              placeholderTextColor={colors.textTertiary}
-              keyboardType="number-pad"
-              value={dailyCigarettes}
-              onChangeText={setDailyCigarettes}
-              maxLength={2}
-            />
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={0}
+    >
+      <TouchableWithoutFeedback onPress={dismissKeyboard}>
+        <ScrollView 
+          style={styles.container}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Progress indicator */}
+          <View style={styles.progress}>
+            <View style={[styles.progressDot, { backgroundColor: colors.primary }]} />
+            <View style={[styles.progressDot, { backgroundColor: colors.cardBorder }]} />
+            <View style={[styles.progressDot, { backgroundColor: colors.cardBorder }]} />
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.textSecondary }]}>
-              Bir paket sigaranın fiyatı? (₺)
+          <View style={styles.content}>
+            <Text style={styles.mascot}>🦎</Text>
+            
+            <Text style={[styles.title, { color: colors.text }]}>
+              Önce birkaç şey öğrenelim
             </Text>
-            <TextInput
-              style={[styles.input, { 
-                backgroundColor: colors.card, 
-                borderColor: colors.cardBorder,
-                color: colors.text,
-              }]}
-              placeholder="Örn: 45"
-              placeholderTextColor={colors.textTertiary}
-              keyboardType="decimal-pad"
-              value={packPrice}
-              onChangeText={setPackPrice}
-              maxLength={4}
-            />
-          </View>
-        </View>
-      </View>
+            
+            <View style={styles.form}>
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>
+                  Günde kaç sigara içiyorsun?
+                </Text>
+                <TextInput
+                  style={[styles.input, { 
+                    backgroundColor: colors.card, 
+                    borderColor: colors.cardBorder,
+                    color: colors.text,
+                  }]}
+                  placeholder="Örn: 10"
+                  placeholderTextColor={colors.textTertiary}
+                  keyboardType="number-pad"
+                  value={dailyCigarettes}
+                  onChangeText={setDailyCigarettes}
+                  maxLength={2}
+                  returnKeyType="next"
+                  onSubmitEditing={() => packPriceInputRef.current?.focus()}
+                  blurOnSubmit={false}
+                />
+              </View>
 
-      <TouchableOpacity
-        style={[
-          styles.button, 
-          { backgroundColor: canContinue ? colors.primary : colors.cardBorder }
-        ]}
-        onPress={handleContinue}
-        disabled={!canContinue}
-        activeOpacity={0.8}
-      >
-        <Text style={[styles.buttonText, { opacity: canContinue ? 1 : 0.5 }]}>
-          Devam Et
-        </Text>
-      </TouchableOpacity>
-    </View>
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>
+                  Bir paket sigaranın fiyatı? (₺)
+                </Text>
+                <TextInput
+                  ref={packPriceInputRef}
+                  style={[styles.input, { 
+                    backgroundColor: colors.card, 
+                    borderColor: colors.cardBorder,
+                    color: colors.text,
+                  }]}
+                  placeholder="Örn: 45"
+                  placeholderTextColor={colors.textTertiary}
+                  keyboardType="decimal-pad"
+                  value={packPrice}
+                  onChangeText={setPackPrice}
+                  maxLength={4}
+                  returnKeyType="done"
+                  onSubmitEditing={handleContinue}
+                />
+              </View>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[
+              styles.button, 
+              { backgroundColor: canContinue ? colors.primary : colors.cardBorder }
+            ]}
+            onPress={handleContinue}
+            disabled={!canContinue}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.buttonText, { opacity: canContinue ? 1 : 0.5 }]}>
+              Devam Et
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing['2xl'],
     paddingBottom: Spacing.xl,
