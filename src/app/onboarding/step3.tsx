@@ -23,18 +23,22 @@ export default function OnboardingStep3() {
   const handleFinish = async () => {
     if (!selected) return;
 
-    // Get onboarding data
-    const onboardingData = useOnboardingStore.getState().getCompleteData();
-    
-    if (!onboardingData) {
-      console.error('Incomplete onboarding data');
-      return;
-    }
-
     // Determine quit date
     const quitDate = selected === 'today' 
       ? getTodayString()
       : getTodayString(); // TODO: Let user select custom date
+
+    // Save step 3 data
+    useOnboardingStore.getState().setStep3Data(quitDate);
+
+    // Get complete onboarding data
+    const onboardingData = useOnboardingStore.getState().getCompleteData();
+    
+    if (!onboardingData) {
+      console.error('Incomplete onboarding data:', useOnboardingStore.getState().data);
+      alert('Bir hata oluştu. Lütfen tekrar dene.');
+      return;
+    }
 
     // Create user profile
     const profile = {
@@ -43,7 +47,7 @@ export default function OnboardingStep3() {
       dailyCigaretteCount: onboardingData.dailyCigarettes,
       packPrice: onboardingData.packPrice,
       cigarettesPerPack: 20,
-      quitDate,
+      quitDate: onboardingData.startDate,
       quitMethod: onboardingData.quitMethod,
       triggers: [],
       motivations: [],
@@ -55,7 +59,7 @@ export default function OnboardingStep3() {
     await setProfile(profile);
     
     // Initialize first day stats
-    await useStatsStore.getState().updateDailyStats(quitDate, {
+    await useStatsStore.getState().updateDailyStats(profile.quitDate, {
       smokeFree: true,
       cigarettesSmoked: 0,
       cravingsLogged: 0,
