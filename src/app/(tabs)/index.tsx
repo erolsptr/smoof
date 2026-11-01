@@ -22,12 +22,13 @@ export default function HomeScreen() {
     if (profile) {
       // Recalculate streak from quit date
       const streakDays = calculateStreakFromQuitDate(profile.quitDate);
-      // Update store if needed
-      if (streakDays !== currentStreak) {
-        useStatsStore.getState().calculateStreak();
+      // Always ensure store has correct streak
+      if (currentStreak !== streakDays) {
+        // Update directly without waiting
+        useStatsStore.setState({ currentStreak: streakDays });
       }
     }
-  }, [profile]);
+  }, [profile?.quitDate]);
 
   // Calculate real stats
   const cigarettesNotSmoked = profile 
