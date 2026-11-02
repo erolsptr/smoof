@@ -503,3 +503,4 @@ const styles = StyleSheet.create({
   noFreezeText: {
     fontSize: Typography.sizes.sm,
   },
+});
