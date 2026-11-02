@@ -5,11 +5,13 @@ import {
   TouchableOpacity, 
   Animated,
   Dimensions,
+  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState, useEffect, useRef } from 'react';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useStatsStore } from '@/store/statsStore';
+import { useUserStore } from '@/store/userStore';
 import { Spacing, Typography, BorderRadius } from '@/constants';
 
 const { height } = Dimensions.get('window');
@@ -26,6 +28,9 @@ export default function CrisisScreen() {
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes = 300 seconds
   const [isBreathing, setIsBreathing] = useState(false);
   const [showResult, setShowResult] = useState(false);
+  const [showSlipFlow, setShowSlipFlow] = useState(false);
+  const [slipStep, setSlipStep] = useState<'trigger' | 'support'>('trigger');
+  const [selectedTrigger, setSelectedTrigger] = useState<string | null>(null);
   const [breathPhase, setBreathPhase] = useState<'inhale' | 'exhale'>('inhale');
   
   // Animation for breathing exercise
@@ -95,13 +100,37 @@ export default function CrisisScreen() {
     setShowResult(true);
   };
   
-  const handleGaveIn = async () => {
-    // Log unsuccessful resistance
+  const handleGaveIn = () => {
+    setShowSlipFlow(true);
+    setSlipStep('trigger');
+  };
+  
+  const handleTriggerSelected = (trigger: string | null) => {
+    setSelectedTrigger(trigger);
+    setSlipStep('support');
+  };
+  
+  const handleUseFreeze = async () => {
+    const success = useUserStore.getState().useStreakFreeze();
+    
+    if (success) {
+      await logCrisis({
+        timestamp: new Date().toISOString(),
+        handled: false,
+        trigger: selectedTrigger || undefined,
+      });
+      router.back();
+    } else {
+      await handleContinueWithoutFreeze();
+    }
+  };
+  
+  const handleContinueWithoutFreeze = async () => {
     await logCrisis({
       timestamp: new Date().toISOString(),
       handled: false,
+      trigger: selectedTrigger || undefined,
     });
-    
     router.back();
   };
   
@@ -115,16 +144,17 @@ export default function CrisisScreen() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
   
-  // Motivational messages
-  const motivations = [
-    "İstek sadece 5 dakika sürer. Sen daha güçlüsün! 💪",
-    "Düşün: Şu ana kadar ne kadar yol kattettin! 🌟",
-    "Bu anı atlatırsan, kendini çok daha iyi hissedeceksin! ✨",
-    "İçindeki güce inan. Sen yapabilirsin! 🦸",
-    "Her direniş seni daha güçlü yapıyor! 🔥",
-  ];
-  
-  const randomMotivation = motivations[Math.floor(Math.random() * motivations.length)];
+  // Motivational message (static, doesn't change)
+  const [motivationMessage] = useState(() => {
+    const messages = [
+      "İstek sadece 5 dakika sürer. Sen daha güçlüsün! 💪",
+      "Düşün: Şu ana kadar ne kadar yol kattettin! 🌟",
+      "Bu anı atlatırsan, kendini çok daha iyi hissedeceksin! ✨",
+      "İçindeki güce inan. Sen yapabilirsin! 🦸",
+      "Her direniş seni daha güçlü yapıyor! 🔥",
+    ];
+    return messages[Math.floor(Math.random() * messages.length)];
+  });
   
   // Breathe animation scale
   const breathScale = breatheAnim.interpolate({
@@ -193,7 +223,7 @@ export default function CrisisScreen() {
       {/* Motivation */}
       <View style={[styles.motivationCard, { backgroundColor: colors.card }]}>
         <Text style={[styles.motivationText, { color: colors.text }]}>
-          {randomMotivation}
+          {motivationMessage}
         </Text>
       </View>
       
@@ -367,3 +397,109 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.bold,
   },
 });
+
+  // Slip Flow Styles
+  slipContent: {
+    padding: Spacing.lg,
+    paddingTop: Spacing['4xl'],
+  },
+  slipMascot: {
+    fontSize: 80,
+    textAlign: 'center',
+    marginBottom: Spacing.lg,
+  },
+  slipTitle: {
+    fontSize: Typography.sizes['3xl'],
+    fontWeight: Typography.weights.bold,
+    textAlign: 'center',
+    marginBottom: Spacing.sm,
+  },
+  slipSubtitle: {
+    fontSize: Typography.sizes.base,
+    textAlign: 'center',
+    marginBottom: Spacing.xl,
+  },
+  slipMessage: {
+    fontSize: Typography.sizes.lg,
+    textAlign: 'center',
+    marginBottom: Spacing.xl,
+    lineHeight: Typography.sizes.lg * Typography.lineHeights.relaxed,
+  },
+  triggerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+    marginBottom: Spacing.xl,
+  },
+  triggerButton: {
+    width: '48%',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 2,
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  triggerIcon: {
+    fontSize: 32,
+  },
+  triggerLabel: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.medium,
+    textAlign: 'center',
+  },
+  continueButton: {
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  continueButtonText: {
+    color: '#FFFFFF',
+    fontSize: Typography.sizes.lg,
+    fontWeight: Typography.weights.bold,
+  },
+  skipText: {
+    fontSize: Typography.sizes.base,
+    textAlign: 'center',
+    paddingVertical: Spacing.sm,
+  },
+  achievementsCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.lg,
+    gap: Spacing.sm,
+  },
+  achievementsTitle: {
+    fontSize: Typography.sizes.lg,
+    fontWeight: Typography.weights.bold,
+    marginBottom: Spacing.xs,
+  },
+  achievementItem: {
+    fontSize: Typography.sizes.base,
+    lineHeight: Typography.sizes.base * 1.5,
+  },
+  freezeButton: {
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  freezeButtonText: {
+    color: '#FFFFFF',
+    fontSize: Typography.sizes.lg,
+    fontWeight: Typography.weights.bold,
+  },
+  freezeButtonSubtext: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: Typography.sizes.sm,
+    marginTop: Spacing.xs,
+  },
+  noFreezeCard: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  noFreezeText: {
+    fontSize: Typography.sizes.sm,
+  },
