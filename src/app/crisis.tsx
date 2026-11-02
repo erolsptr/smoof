@@ -396,8 +396,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
   },
-});
-
   // Slip Flow Styles
   slipContent: {
     padding: Spacing.lg,
@@ -405,29 +403,29 @@ const styles = StyleSheet.create({
   },
   slipMascot: {
     fontSize: 80,
-    textAlign: 'center',
+    textAlign: 'center' as const,
     marginBottom: Spacing.lg,
   },
   slipTitle: {
     fontSize: Typography.sizes['3xl'],
     fontWeight: Typography.weights.bold,
-    textAlign: 'center',
+    textAlign: 'center' as const,
     marginBottom: Spacing.sm,
   },
   slipSubtitle: {
     fontSize: Typography.sizes.base,
-    textAlign: 'center',
+    textAlign: 'center' as const,
     marginBottom: Spacing.xl,
   },
   slipMessage: {
     fontSize: Typography.sizes.lg,
-    textAlign: 'center',
+    textAlign: 'center' as const,
     marginBottom: Spacing.xl,
     lineHeight: Typography.sizes.lg * Typography.lineHeights.relaxed,
   },
   triggerGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
     gap: Spacing.sm,
     marginBottom: Spacing.xl,
   },
@@ -436,7 +434,7 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
     borderWidth: 2,
-    alignItems: 'center',
+    alignItems: 'center' as const,
     gap: Spacing.xs,
   },
   triggerIcon: {
@@ -445,12 +443,12 @@ const styles = StyleSheet.create({
   triggerLabel: {
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.medium,
-    textAlign: 'center',
+    textAlign: 'center' as const,
   },
   continueButton: {
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.md,
-    alignItems: 'center',
+    alignItems: 'center' as const,
     marginBottom: Spacing.md,
   },
   continueButtonText: {
@@ -460,7 +458,7 @@ const styles = StyleSheet.create({
   },
   skipText: {
     fontSize: Typography.sizes.base,
-    textAlign: 'center',
+    textAlign: 'center' as const,
     paddingVertical: Spacing.sm,
   },
   achievementsCard: {
@@ -481,7 +479,7 @@ const styles = StyleSheet.create({
   freezeButton: {
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.md,
-    alignItems: 'center',
+    alignItems: 'center' as const,
     marginBottom: Spacing.md,
   },
   freezeButtonText: {
@@ -497,7 +495,7 @@ const styles = StyleSheet.create({
   noFreezeCard: {
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
-    alignItems: 'center',
+    alignItems: 'center' as const,
     marginBottom: Spacing.md,
   },
   noFreezeText: {
