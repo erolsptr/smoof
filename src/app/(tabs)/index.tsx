@@ -1,11 +1,13 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useUserStore } from '@/store/userStore';
 import { useStatsStore } from '@/store/statsStore';
 import { calculateStreakFromQuitDate } from '@/utils/dateHelpers';
 import { Spacing, Typography, BorderRadius } from '@/constants';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 
 /**
  * Home Screen - Dashboard
@@ -18,6 +20,77 @@ export default function HomeScreen() {
   const currentStreak = useStatsStore((state) => state.currentStreak);
   
   const [activeCard, setActiveCard] = useState(0);
+  
+  // Check if quit date is in the future
+  const quitDate = profile?.quitDate ? new Date(profile.quitDate) : null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const isPreparationMode = quitDate ? quitDate > today : false;
+  const daysUntilQuit = quitDate 
+    ? Math.ceil((quitDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    : 0;
+  
+  // Animation values
+  const mascotScale = useRef(new Animated.Value(1)).current;
+  const streakScale = useRef(new Animated.Value(0)).current;
+  const streakOpacity = useRef(new Animated.Value(0)).current;
+  const cardsOpacity = useRef(new Animated.Value(0)).current;
+  const cardsTranslateY = useRef(new Animated.Value(30)).current;
+  const crisisButtonScale = useRef(new Animated.Value(1)).current;
+  
+  // Entrance animations
+  useEffect(() => {
+    // Mascot bounce
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(mascotScale, {
+          toValue: 1.1,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(mascotScale, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+    
+    // Streak entrance
+    Animated.parallel([
+      Animated.spring(streakScale, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+      Animated.timing(streakOpacity, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
+    // Cards entrance (delayed) - only in normal mode
+    if (!isPreparationMode) {
+      Animated.sequence([
+        Animated.delay(300),
+        Animated.parallel([
+          Animated.timing(cardsOpacity, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.spring(cardsTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 7,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
+    }
+  }, [isPreparationMode]);
 
   // Calculate real stats from profile and keep streak synced
   useEffect(() => {
@@ -46,17 +119,20 @@ export default function HomeScreen() {
     { 
       label: 'İçilmeyen Sigara', 
       value: cigarettesNotSmoked.toLocaleString('tr-TR'), 
-      icon: '🚭' 
+      iconName: 'close-circle' as const,
+      iconColor: '#EF4444',
     },
     { 
       label: 'Para Tasarrufu', 
       value: `₺${moneySaved.toFixed(0)}`, 
-      icon: '💰' 
+      iconName: 'cash' as const,
+      iconColor: '#F59E0B',
     },
     { 
       label: 'Kazanılan Zaman', 
       value: `${timeSavedHours} saat`, 
-      icon: '⏱️' 
+      iconName: 'time' as const,
+      iconColor: '#3B82F6',
     },
   ];
 
@@ -70,6 +146,200 @@ export default function HomeScreen() {
     return 'Efsanesin! Ne kadar güçlüsün 👑';
   };
 
+  // Preparation mode messages based on user's motivations
+  const getPreparationMessage = () => {
+    const motivations = profile?.motivations || [];
+    const messages = [];
+
+    if (motivations.includes('health')) {
+      messages.push('Sağlığın için harika bir karar verdin! ❤️');
+    }
+    if (motivations.includes('money')) {
+      messages.push('Tasarruf zamanı başlıyor! 💰');
+    }
+    if (motivations.includes('family')) {
+      messages.push('Sevdiklerin için bu adımı atıyorsun 👨‍👩‍👧‍👦');
+    }
+    if (motivations.includes('freedom')) {
+      messages.push('Bağımsızlık yakında senin olacak! 🦋');
+    }
+    if (motivations.includes('appearance')) {
+      messages.push('Cildin ve dişlerin teşekkür edecek! ✨');
+    }
+    if (motivations.includes('sports')) {
+      messages.push('Performansın artacak! 🏃‍♂️');
+    }
+
+    return messages.length > 0 
+      ? messages[Math.floor(Math.random() * messages.length)]
+      : 'Harika bir karar verdin! 🌟';
+  };
+
+  // If in preparation mode, show countdown screen
+  if (isPreparationMode) {
+    return (
+      <ScrollView 
+        style={[styles.container, { backgroundColor: colors.background }]}
+        contentContainerStyle={styles.content}
+      >
+        {/* Mascot & Message */}
+        <View style={styles.header}>
+          <Animated.View 
+            style={[
+              styles.avatarPlaceholder,
+              { 
+                backgroundColor: 'transparent',
+                transform: [{ scale: mascotScale }] 
+              }
+            ]}
+          >
+            <Image 
+              source={require('../../../assets/smoof.png')}
+              style={styles.smoofImage}
+              resizeMode="contain"
+            />
+          </Animated.View>
+          <Text style={[styles.greeting, { color: colors.text }]}>
+            Sözünü Aldım! 🤝
+          </Text>
+          <Text style={[styles.subGreeting, { color: colors.textSecondary }]}>
+            {quitDate?.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })} günü sigarayı bırakıyoruz
+          </Text>
+        </View>
+
+        {/* Countdown Card */}
+        <LinearGradient
+          colors={[colors.primary, colors.primaryDark]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.streakCard}
+        >
+          <View style={styles.streakIconContainer}>
+            <Ionicons name="calendar" size={32} color="#FFF" />
+          </View>
+          <Text style={styles.streakLabel}>Başlamaya Kalan</Text>
+          <View style={styles.streakRow}>
+            <Text style={styles.streakNumber}>{daysUntilQuit}</Text>
+            <Text style={styles.streakDays}>GÜN</Text>
+          </View>
+        </LinearGradient>
+
+        {/* Motivational Messages */}
+        <View style={styles.preparationSection}>
+          <View style={[styles.messageCard, { 
+            backgroundColor: colors.card,
+            borderColor: colors.cardBorder,
+          }]}>
+            <Ionicons name="heart" size={40} color="#FC8181" />
+            <Text style={[styles.messageTitle, { color: colors.text }]}>
+              O zamana kadar kafanı topla!
+            </Text>
+            <Text style={[styles.messageText, { color: colors.textSecondary }]}>
+              {getPreparationMessage()}
+            </Text>
+          </View>
+
+          {/* Tips for preparation */}
+          <View style={[styles.tipsCard, { 
+            backgroundColor: colors.card,
+            borderColor: colors.cardBorder,
+          }]}>
+            <View style={styles.tipHeader}>
+              <Ionicons name="bulb" size={24} color="#F59E0B" />
+              <Text style={[styles.tipsTitle, { color: colors.text }]}>
+                Hazırlık İpuçları
+              </Text>
+            </View>
+            
+            <View style={styles.tipsList}>
+              <View style={styles.tipItem}>
+                <View style={[styles.tipBullet, { backgroundColor: colors.primary }]} />
+                <Text style={[styles.tipText, { color: colors.textSecondary }]}>
+                  Sigaralarını ve çakmağını şimdiden at
+                </Text>
+              </View>
+              <View style={styles.tipItem}>
+                <View style={[styles.tipBullet, { backgroundColor: colors.primary }]} />
+                <Text style={[styles.tipText, { color: colors.textSecondary }]}>
+                  Sevdiklerine söyle, destek al
+                </Text>
+              </View>
+              <View style={styles.tipItem}>
+                <View style={[styles.tipBullet, { backgroundColor: colors.primary }]} />
+                <Text style={[styles.tipText, { color: colors.textSecondary }]}>
+                  Stresli durumlar için plan yap
+                </Text>
+              </View>
+              <View style={styles.tipItem}>
+                <View style={[styles.tipBullet, { backgroundColor: colors.primary }]} />
+                <Text style={[styles.tipText, { color: colors.textSecondary }]}>
+                  Bol bol su iç, sağlıklı atıştırmalıklar al
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* What will happen section */}
+          <View style={[styles.benefitsCard, { 
+            backgroundColor: colors.card,
+            borderColor: colors.cardBorder,
+          }]}>
+            <View style={styles.tipHeader}>
+              <Ionicons name="sparkles" size={24} color="#8B5CF6" />
+              <Text style={[styles.tipsTitle, { color: colors.text }]}>
+                Seni Neler Bekliyor
+              </Text>
+            </View>
+            
+            <View style={styles.benefitsList}>
+              <View style={styles.benefitItem}>
+                <View style={[styles.benefitIcon, { backgroundColor: '#EF4444' + '20' }]}>
+                  <Ionicons name="heart" size={20} color="#EF4444" />
+                </View>
+                <View style={styles.benefitContent}>
+                  <Text style={[styles.benefitTitle, { color: colors.text }]}>
+                    20 dakika sonra
+                  </Text>
+                  <Text style={[styles.benefitDesc, { color: colors.textSecondary }]}>
+                    Nabzın normale döner
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={styles.benefitItem}>
+                <View style={[styles.benefitIcon, { backgroundColor: '#3B82F6' + '20' }]}>
+                  <Ionicons name="fitness" size={20} color="#3B82F6" />
+                </View>
+                <View style={styles.benefitContent}>
+                  <Text style={[styles.benefitTitle, { color: colors.text }]}>
+                    2 hafta sonra
+                  </Text>
+                  <Text style={[styles.benefitDesc, { color: colors.textSecondary }]}>
+                    Nefes almak kolaylaşır
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={styles.benefitItem}>
+                <View style={[styles.benefitIcon, { backgroundColor: '#10B981' + '20' }]}>
+                  <Ionicons name="happy" size={20} color="#10B981" />
+                </View>
+                <View style={styles.benefitContent}>
+                  <Text style={[styles.benefitTitle, { color: colors.text }]}>
+                    1 ay sonra
+                  </Text>
+                  <Text style={[styles.benefitDesc, { color: colors.textSecondary }]}>
+                    Öksürük ve yorgunluk azalır
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+    );
+  }
+
   return (
     <ScrollView 
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -77,26 +347,65 @@ export default function HomeScreen() {
     >
       {/* Mascot & Greeting */}
       <View style={styles.header}>
-        <Text style={styles.mascot}>🦎</Text>
-        <Text style={[styles.greeting, { color: colors.textSecondary }]}>
+        <Animated.View 
+          style={[
+            styles.avatarPlaceholder,
+            { 
+              backgroundColor: 'transparent',
+              transform: [{ scale: mascotScale }] 
+            }
+          ]}
+        >
+          <Image 
+            source={require('../../../assets/smoof.png')}
+            style={styles.smoofImage}
+            resizeMode="contain"
+          />
+        </Animated.View>
+        <Text style={[styles.greeting, { color: colors.text }]}>
           Merhaba! Bugün nasılsın?
         </Text>
-      </View>
-
-      {/* Streak Counter - Hero Section */}
-      <View style={[styles.streakCard, { backgroundColor: colors.primary }]}>
-        <Text style={styles.streakLabel}>Sigarasız Günler</Text>
-        <View style={styles.streakRow}>
-          <Text style={styles.streakNumber}>{currentStreak}</Text>
-          <Text style={styles.streakFire}>🔥</Text>
-        </View>
-        <Text style={styles.streakSubtext}>
+        <Text style={[styles.subGreeting, { color: colors.textSecondary }]}>
           {getMotivationalMessage()}
         </Text>
       </View>
 
+      {/* Streak Counter - Hero Section */}
+      <Animated.View 
+        style={[
+          { 
+            opacity: streakOpacity,
+            transform: [{ scale: streakScale }]
+          }
+        ]}
+      >
+        <LinearGradient
+          colors={[colors.primary, colors.primaryDark]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.streakCard}
+        >
+          <View style={styles.streakIconContainer}>
+            <Ionicons name="flame" size={32} color="#FFF" />
+          </View>
+          <Text style={styles.streakLabel}>Sigarasız Streak</Text>
+          <View style={styles.streakRow}>
+            <Text style={styles.streakNumber}>{currentStreak}</Text>
+            <Text style={styles.streakDays}>GÜN</Text>
+          </View>
+        </LinearGradient>
+      </Animated.View>
+
       {/* Stats Carousel */}
-      <View style={styles.carouselContainer}>
+      <Animated.View 
+        style={[
+          styles.carouselContainer,
+          {
+            opacity: cardsOpacity,
+            transform: [{ translateY: cardsTranslateY }]
+          }
+        ]}
+      >
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -115,7 +424,9 @@ export default function HomeScreen() {
                 borderColor: colors.cardBorder,
               }]}
             >
-              <Text style={styles.statIcon}>{stat.icon}</Text>
+              <View style={[styles.statIconCircle, { backgroundColor: stat.iconColor + '20' }]}>
+                <Ionicons name={stat.iconName} size={32} color={stat.iconColor} />
+              </View>
               <Text style={[styles.statValue, { color: colors.text }]}>
                 {stat.value}
               </Text>
@@ -140,15 +451,30 @@ export default function HomeScreen() {
             />
           ))}
         </View>
-      </View>
+      </Animated.View>
 
       {/* Crisis Button */}
       <TouchableOpacity
         style={[styles.crisisButton, { backgroundColor: colors.error }]}
         activeOpacity={0.8}
         onPress={() => router.push('/crisis')}
+        onPressIn={() => {
+          Animated.spring(crisisButtonScale, {
+            toValue: 0.95,
+            useNativeDriver: true,
+          }).start();
+        }}
+        onPressOut={() => {
+          Animated.spring(crisisButtonScale, {
+            toValue: 1,
+            useNativeDriver: true,
+          }).start();
+        }}
       >
-        <Text style={styles.crisisText}>🆘 Sigara İçmek İstiyorum</Text>
+        <Animated.View style={[styles.crisisButtonContent, { transform: [{ scale: crisisButtonScale }] }]}>
+          <Ionicons name="alert-circle" size={24} color="#FFFFFF" />
+          <Text style={styles.crisisText}>Sigara İçmek İstiyorum</Text>
+        </Animated.View>
       </TouchableOpacity>
 
       {/* Quick Stats */}
@@ -161,7 +487,9 @@ export default function HomeScreen() {
           borderColor: colors.cardBorder,
         }]}>
           <View style={styles.quickItem}>
-            <Text style={styles.quickIcon}>⏱️</Text>
+            <View style={[styles.quickIconCircle, { backgroundColor: colors.accent + '20' }]}>
+              <Ionicons name="time-outline" size={20} color={colors.accent} />
+            </View>
             <Text style={[styles.quickText, { color: colors.textSecondary }]}>
               Tasarruf edilen zaman: <Text style={[styles.quickValue, { color: colors.text }]}>
                 {timeSavedHours} saat
@@ -169,7 +497,9 @@ export default function HomeScreen() {
             </Text>
           </View>
           <View style={styles.quickItem}>
-            <Text style={styles.quickIcon}>❤️</Text>
+            <View style={[styles.quickIconCircle, { backgroundColor: colors.error + '20' }]}>
+              <Ionicons name="heart" size={20} color={colors.error} />
+            </View>
             <Text style={[styles.quickText, { color: colors.textSecondary }]}>
               Kalp sağlığı: <Text style={[styles.quickValue, { color: colors.success }]}>
                 {currentStreak > 0 ? 'İyileşiyor' : 'Başlamaya hazır'}
@@ -192,44 +522,73 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.xl,
   },
-  mascot: {
-    fontSize: 48,
-    marginBottom: Spacing.sm,
+  avatarPlaceholder: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  smoofImage: {
+    width: 110,
+    height: 110,
+  },
+  avatarEmoji: {
+    fontSize: 40,
   },
   greeting: {
-    fontSize: Typography.sizes.base,
+    fontSize: Typography.sizes.xl,
+    fontWeight: Typography.weights.semibold,
+    marginBottom: Spacing.xs,
+  },
+  subGreeting: {
+    fontSize: Typography.sizes.sm,
   },
   streakCard: {
     padding: Spacing.xl,
     borderRadius: BorderRadius.xl,
     alignItems: 'center',
     marginBottom: Spacing.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  streakIconContainer: {
+    marginBottom: Spacing.sm,
   },
   streakLabel: {
     color: 'rgba(255,255,255,0.9)',
-    fontSize: Typography.sizes.base,
+    fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.medium,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.md,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   streakRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    marginBottom: Spacing.sm,
+    alignItems: 'baseline',
+    gap: Spacing.sm,
   },
   streakNumber: {
     color: '#FFFFFF',
-    fontSize: Typography.sizes['5xl'],
+    fontSize: 72,
     fontWeight: Typography.weights.extrabold,
+    lineHeight: 72,
   },
-  streakFire: {
-    fontSize: 40,
-  },
-  streakSubtext: {
+  streakDays: {
     color: 'rgba(255,255,255,0.9)',
-    fontSize: Typography.sizes.sm,
+    fontSize: Typography.sizes.lg,
+    fontWeight: Typography.weights.bold,
   },
   carouselContainer: {
     marginBottom: Spacing.lg,
@@ -244,9 +603,18 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  statIcon: {
-    fontSize: 48,
+  statIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: Spacing.md,
   },
   statValue: {
@@ -273,6 +641,16 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     alignItems: 'center',
     marginBottom: Spacing.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  crisisButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
   },
   crisisText: {
     color: '#FFFFFF',
@@ -297,8 +675,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.sm,
   },
-  quickIcon: {
-    fontSize: 24,
+  quickIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   quickText: {
     fontSize: Typography.sizes.base,
@@ -306,5 +688,107 @@ const styles = StyleSheet.create({
   },
   quickValue: {
     fontWeight: Typography.weights.semibold,
+  },
+  preparationSection: {
+    gap: Spacing.lg,
+  },
+  messageCard: {
+    padding: Spacing.xl,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    alignItems: 'center',
+    gap: Spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  messageTitle: {
+    fontSize: Typography.sizes['2xl'],
+    fontWeight: Typography.weights.bold,
+    textAlign: 'center',
+  },
+  messageText: {
+    fontSize: Typography.sizes.base,
+    textAlign: 'center',
+    lineHeight: Typography.sizes.base * 1.5,
+  },
+  tipsCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    gap: Spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  tipHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  tipsTitle: {
+    fontSize: Typography.sizes.lg,
+    fontWeight: Typography.weights.bold,
+  },
+  tipsList: {
+    gap: Spacing.md,
+  },
+  tipItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+  },
+  tipBullet: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginTop: 7,
+  },
+  tipText: {
+    fontSize: Typography.sizes.base,
+    flex: 1,
+    lineHeight: Typography.sizes.base * 1.5,
+  },
+  benefitsCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    gap: Spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  benefitsList: {
+    gap: Spacing.md,
+  },
+  benefitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  benefitIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  benefitContent: {
+    flex: 1,
+  },
+  benefitTitle: {
+    fontSize: Typography.sizes.base,
+    fontWeight: Typography.weights.semibold,
+    marginBottom: 2,
+  },
+  benefitDesc: {
+    fontSize: Typography.sizes.sm,
   },
 });

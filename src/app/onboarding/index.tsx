@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Spacing, Typography } from '@/constants';
@@ -14,7 +14,11 @@ export default function OnboardingWelcome() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
-        <Text style={styles.mascot}>🦎</Text>
+        <Image 
+          source={require('../../../assets/smoof.png')}
+          style={styles.mascot}
+          resizeMode="contain"
+        />
         
         <Text style={[styles.title, { color: colors.text }]}>
           Merhaba! Ben Smoof 👋
@@ -49,7 +53,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   mascot: {
-    fontSize: 120,
+    width: 150,
+    height: 150,
     marginBottom: Spacing.xl,
   },
   title: {

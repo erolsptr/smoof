@@ -1,174 +1,185 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  TextInput, 
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
+  Image,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useOnboardingStore } from '@/store/onboardingStore';
 import { Spacing, Typography, BorderRadius } from '@/constants';
-import type { QuitMethod } from '@/types';
 
 /**
- * Onboarding Step 2: Quit method selection
- * - Cold turkey vs Gradual reduction
+ * Onboarding Step 2: Pack price
  */
-export default function OnboardingStep2() {
+export default function Step2Screen() {
   const { colors } = useColorScheme();
   const router = useRouter();
+  const { data, setStep2Data } = useOnboardingStore();
   
-  const [selected, setSelected] = useState<QuitMethod | null>(null);
+  const [packPrice, setPackPrice] = useState('');
+
+  const canContinue = packPrice.length > 0 && parseFloat(packPrice) > 0;
 
   const handleContinue = () => {
-    if (selected) {
-      useOnboardingStore.getState().setStep2Data(selected);
+    if (canContinue) {
+      const price = parseFloat(packPrice);
+      const dailyCigs = data.dailyCigarettes || 20;
+      setStep2Data(dailyCigs, price, 0); // smokingYears = 0 for now
       router.push('/onboarding/step3');
     }
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Progress indicator */}
-      <View style={styles.progress}>
-        <View style={[styles.progressDot, { backgroundColor: colors.primary }]} />
-        <View style={[styles.progressDot, { backgroundColor: colors.primary }]} />
-        <View style={[styles.progressDot, { backgroundColor: colors.cardBorder }]} />
-      </View>
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.content}>
+          {/* Progress */}
+          <View style={styles.progress}>
+            <View style={[styles.progressDot, { backgroundColor: colors.primary }]} />
+            <View style={[styles.progressDot, { backgroundColor: colors.primary }]} />
+            <View style={[styles.progressDot, { backgroundColor: colors.cardBorder }]} />
+            <View style={[styles.progressDot, { backgroundColor: colors.cardBorder }]} />
+            <View style={[styles.progressDot, { backgroundColor: colors.cardBorder }]} />
+          </View>
 
-      <View style={styles.content}>
-        <Text style={styles.mascot}>🦎</Text>
-        
-        <Text style={[styles.title, { color: colors.text }]}>
-          Nasıl bırakmak istiyorsun?
-        </Text>
-        
-        <View style={styles.options}>
+          {/* Mascot */}
+          <Image 
+            source={require('../../../assets/smoof.png')}
+            style={styles.mascot}
+            resizeMode="contain"
+          />
+          
+          {/* Question */}
+          <Text style={[styles.question, { color: colors.text }]}>
+            Bir paket sigara ne kadar? 💰
+          </Text>
+          
+          <Text style={[styles.hint, { color: colors.textSecondary }]}>
+            Genelde aldığın paket
+          </Text>
+
+          {/* Input */}
+          <View style={styles.inputContainer}>
+            <Text style={[styles.currency, { color: colors.textSecondary }]}>
+              ₺
+            </Text>
+            <TextInput
+              style={[
+                styles.input,
+                { 
+                  backgroundColor: colors.card,
+                  color: colors.text,
+                  borderColor: packPrice ? colors.primary : colors.cardBorder,
+                }
+              ]}
+              value={packPrice}
+              onChangeText={setPackPrice}
+              placeholder="125"
+              placeholderTextColor={colors.textTertiary}
+              keyboardType="decimal-pad"
+              autoFocus
+              maxLength={4}
+            />
+          </View>
+
+          {/* Continue Button */}
           <TouchableOpacity
             style={[
-              styles.option,
-              {
-                backgroundColor: selected === 'cold-turkey' ? colors.primary : colors.card,
-                borderColor: selected === 'cold-turkey' ? colors.primary : colors.cardBorder,
-              },
+              styles.button, 
+              { backgroundColor: canContinue ? colors.primary : colors.cardBorder }
             ]}
-            onPress={() => setSelected('cold-turkey')}
+            onPress={handleContinue}
+            disabled={!canContinue}
             activeOpacity={0.8}
           >
-            <Text style={styles.optionIcon}>🚀</Text>
-            <Text style={[
-              styles.optionTitle,
-              { color: selected === 'cold-turkey' ? '#FFFFFF' : colors.text },
-            ]}>
-              Tamamen Bırak
-            </Text>
-            <Text style={[
-              styles.optionDesc,
-              { color: selected === 'cold-turkey' ? 'rgba(255,255,255,0.9)' : colors.textSecondary },
-            ]}>
-              Bugünden itibaren hiç sigara içmiyorum
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.option,
-              {
-                backgroundColor: selected === 'gradual' ? colors.primary : colors.card,
-                borderColor: selected === 'gradual' ? colors.primary : colors.cardBorder,
-              },
-            ]}
-            onPress={() => setSelected('gradual')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.optionIcon}>📉</Text>
-            <Text style={[
-              styles.optionTitle,
-              { color: selected === 'gradual' ? '#FFFFFF' : colors.text },
-            ]}>
-              Kademeli Azalt
-            </Text>
-            <Text style={[
-              styles.optionDesc,
-              { color: selected === 'gradual' ? 'rgba(255,255,255,0.9)' : colors.textSecondary },
-            ]}>
-              Yavaş yavaş azaltarak bırakıyorum
+            <Text style={[styles.buttonText, { opacity: canContinue ? 1 : 0.5 }]}>
+              Devam Et
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
-
-      <TouchableOpacity
-        style={[
-          styles.button, 
-          { backgroundColor: selected ? colors.primary : colors.cardBorder }
-        ]}
-        onPress={handleContinue}
-        disabled={!selected}
-        activeOpacity={0.8}
-      >
-        <Text style={[styles.buttonText, { opacity: selected ? 1 : 0.5 }]}>
-          Devam Et
-        </Text>
-      </TouchableOpacity>
-    </View>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing['2xl'],
-    paddingBottom: Spacing.xl,
+  },
+  content: {
+    flex: 1,
+    padding: Spacing.lg,
+    paddingTop: Spacing['4xl'],
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   progress: {
     flexDirection: 'row',
-    justifyContent: 'center',
     gap: Spacing.sm,
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing['2xl'],
+    position: 'absolute',
+    top: Spacing['2xl'],
   },
   progressDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
   },
-  content: {
-    flex: 1,
-  },
   mascot: {
-    fontSize: 60,
-    textAlign: 'center',
-    marginBottom: Spacing.lg,
-  },
-  title: {
-    fontSize: Typography.sizes['2xl'],
-    fontWeight: Typography.weights.bold,
-    textAlign: 'center',
+    width: 80,
+    height: 80,
     marginBottom: Spacing.xl,
   },
-  options: {
-    gap: Spacing.md,
-  },
-  option: {
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 2,
-    alignItems: 'center',
-  },
-  optionIcon: {
-    fontSize: 48,
-    marginBottom: Spacing.sm,
-  },
-  optionTitle: {
-    fontSize: Typography.sizes.xl,
+  question: {
+    fontSize: Typography.sizes['3xl'],
     fontWeight: Typography.weights.bold,
-    marginBottom: Spacing.xs,
-  },
-  optionDesc: {
-    fontSize: Typography.sizes.sm,
     textAlign: 'center',
+    marginBottom: Spacing.md,
+  },
+  hint: {
+    fontSize: Typography.sizes.base,
+    textAlign: 'center',
+    marginBottom: Spacing['2xl'],
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    marginBottom: Spacing['3xl'],
+  },
+  currency: {
+    fontSize: Typography.sizes['2xl'],
+  },
+  input: {
+    fontSize: Typography.sizes['4xl'],
+    fontWeight: Typography.weights.bold,
+    textAlign: 'center',
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 2,
+    minWidth: 140,
   },
   button: {
+    width: '100%',
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.md,
     alignItems: 'center',
+    position: 'absolute',
+    bottom: Spacing.xl,
+    left: Spacing.lg,
+    right: Spacing.lg,
   },
   buttonText: {
     color: '#FFFFFF',

@@ -1,170 +1,127 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  ScrollView,
+  Image,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { useUserStore } from '@/store/userStore';
-import { useStatsStore } from '@/store/statsStore';
 import { useOnboardingStore } from '@/store/onboardingStore';
-import { getTodayString } from '@/utils/dateHelpers';
 import { Spacing, Typography, BorderRadius } from '@/constants';
+import { Ionicons } from '@expo/vector-icons';
 
 /**
- * Onboarding Step 3: When to start?
- * - Today / Custom date
+ * Onboarding Step 3: Motivation
  */
 export default function OnboardingStep3() {
   const { colors } = useColorScheme();
   const router = useRouter();
-  const completeOnboarding = useUserStore((state) => state.completeOnboarding);
-  const setProfile = useUserStore((state) => state.setProfile);
   
-  const [selected, setSelected] = useState<'today' | 'custom' | null>(null);
+  const [selectedMotivations, setSelectedMotivations] = useState<string[]>([]);
 
-  const handleFinish = async () => {
-    if (!selected) return;
+  const motivations = [
+    { id: 'health', label: 'Sağlığım', icon: 'heart' as const },
+    { id: 'money', label: 'Para Tasarrufu', icon: 'cash' as const },
+    { id: 'family', label: 'Ailem', icon: 'people' as const },
+    { id: 'sports', label: 'Spor/Kondisyon', icon: 'fitness' as const },
+    { id: 'smell', label: 'Koku/Görünüm', icon: 'sparkles' as const },
+    { id: 'freedom', label: 'Özgürlük', icon: 'rocket' as const },
+  ];
 
-    // Determine quit date
-    const quitDate = selected === 'today' 
-      ? getTodayString()
-      : getTodayString(); // TODO: Let user select custom date
-
-    // Save step 3 data
-    useOnboardingStore.getState().setStep3Data(quitDate);
-
-    // Get complete onboarding data
-    const onboardingData = useOnboardingStore.getState().getCompleteData();
-    
-    if (!onboardingData) {
-      console.error('Incomplete onboarding data:', useOnboardingStore.getState().data);
-      alert('Bir hata oluştu. Lütfen tekrar dene.');
-      return;
+  const toggleMotivation = (id: string) => {
+    if (selectedMotivations.includes(id)) {
+      setSelectedMotivations(selectedMotivations.filter(m => m !== id));
+    } else {
+      setSelectedMotivations([...selectedMotivations, id]);
     }
+  };
 
-    // Create user profile
-    const profile = {
-      id: `user_${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      dailyCigaretteCount: onboardingData.dailyCigarettes,
-      packPrice: onboardingData.packPrice,
-      cigarettesPerPack: 20,
-      quitDate: onboardingData.startDate,
-      quitMethod: onboardingData.quitMethod,
-      triggers: [],
-      motivations: [],
-      streakFreezes: 2, // Weekly allowance
-      streakFreezesUsed: 0,
-    };
+  const canContinue = selectedMotivations.length > 0;
 
-    // Save profile
-    await setProfile(profile);
-    
-    // Initialize first day stats
-    await useStatsStore.getState().updateDailyStats(profile.quitDate, {
-      smokeFree: true,
-      cigarettesSmoked: 0,
-      cravingsLogged: 0,
-      crisesHandled: 0,
-    });
-    
-    // Clear onboarding temp data
-    useOnboardingStore.getState().clearData();
-    
-    // Navigate to main app
-    router.replace('/(tabs)');
+  const handleContinue = () => {
+    if (canContinue) {
+      useOnboardingStore.getState().setStep3Data(selectedMotivations);
+      router.push('/onboarding/step4');
+    }
   };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Progress indicator */}
-      <View style={styles.progress}>
-        <View style={[styles.progressDot, { backgroundColor: colors.primary }]} />
-        <View style={[styles.progressDot, { backgroundColor: colors.primary }]} />
-        <View style={[styles.progressDot, { backgroundColor: colors.primary }]} />
-      </View>
+      <ScrollView contentContainerStyle={styles.content}>
+        {/* Progress */}
+        <View style={styles.progress}>
+          <View style={[styles.progressDot, { backgroundColor: colors.primary }]} />
+          <View style={[styles.progressDot, { backgroundColor: colors.primary }]} />
+          <View style={[styles.progressDot, { backgroundColor: colors.primary }]} />
+          <View style={[styles.progressDot, { backgroundColor: colors.cardBorder }]} />
+          <View style={[styles.progressDot, { backgroundColor: colors.cardBorder }]} />
+        </View>
 
-      <View style={styles.content}>
-        <Text style={styles.mascot}>🦎</Text>
+        {/* Mascot */}
+        <Image 
+          source={require('../../../assets/smoof.png')}
+          style={styles.mascot}
+          resizeMode="contain"
+        />
         
-        <Text style={[styles.title, { color: colors.text }]}>
-          Ne zaman başlıyoruz?
+        {/* Question */}
+        <Text style={[styles.question, { color: colors.text }]}>
+          Neden bırakmak istiyorsun? 🎯
         </Text>
         
-        <View style={styles.options}>
-          <TouchableOpacity
-            style={[
-              styles.option,
-              {
-                backgroundColor: selected === 'today' ? colors.primary : colors.card,
-                borderColor: selected === 'today' ? colors.primary : colors.cardBorder,
-              },
-            ]}
-            onPress={() => setSelected('today')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.optionIcon}>⚡</Text>
-            <Text style={[
-              styles.optionTitle,
-              { color: selected === 'today' ? '#FFFFFF' : colors.text },
-            ]}>
-              Hemen Başla
-            </Text>
-            <Text style={[
-              styles.optionDesc,
-              { color: selected === 'today' ? 'rgba(255,255,255,0.9)' : colors.textSecondary },
-            ]}>
-              Bugün ilk günüm olsun!
-            </Text>
-          </TouchableOpacity>
+        <Text style={[styles.hint, { color: colors.textSecondary }]}>
+          Birden fazla seçebilirsin
+        </Text>
 
-          <TouchableOpacity
-            style={[
-              styles.option,
-              {
-                backgroundColor: selected === 'custom' ? colors.primary : colors.card,
-                borderColor: selected === 'custom' ? colors.primary : colors.cardBorder,
-              },
-            ]}
-            onPress={() => setSelected('custom')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.optionIcon}>📅</Text>
-            <Text style={[
-              styles.optionTitle,
-              { color: selected === 'custom' ? '#FFFFFF' : colors.text },
-            ]}>
-              Tarih Seç
-            </Text>
-            <Text style={[
-              styles.optionDesc,
-              { color: selected === 'custom' ? 'rgba(255,255,255,0.9)' : colors.textSecondary },
-            ]}>
-              Hazırlık yapmak istiyorum
-            </Text>
-          </TouchableOpacity>
+        {/* Options */}
+        <View style={styles.optionsGrid}>
+          {motivations.map((motivation) => {
+            const isSelected = selectedMotivations.includes(motivation.id);
+            return (
+              <TouchableOpacity
+                key={motivation.id}
+                style={[
+                  styles.option,
+                  {
+                    backgroundColor: isSelected ? colors.primary : colors.card,
+                    borderColor: isSelected ? colors.primary : colors.cardBorder,
+                  }
+                ]}
+                onPress={() => toggleMotivation(motivation.id)}
+                activeOpacity={0.7}
+              >
+                <Ionicons 
+                  name={motivation.icon} 
+                  size={32} 
+                  color={isSelected ? '#FFF' : colors.text} 
+                />
+                <Text style={[
+                  styles.optionLabel,
+                  { color: isSelected ? '#FFF' : colors.text }
+                ]}>
+                  {motivation.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
+      </ScrollView>
 
-        <View style={styles.encouragement}>
-          <Text style={styles.encouragementMascot}>💚</Text>
-          <Text style={[styles.encouragementText, { color: colors.textSecondary }]}>
-            "Sen yapabilirsin! Ben her zaman yanındayım."
-          </Text>
-          <Text style={[styles.encouragementAuthor, { color: colors.textTertiary }]}>
-            - Smoof
-          </Text>
-        </View>
-      </View>
-
+      {/* Continue Button */}
       <TouchableOpacity
         style={[
           styles.button, 
-          { backgroundColor: selected ? colors.primary : colors.cardBorder }
+          { backgroundColor: canContinue ? colors.primary : colors.cardBorder }
         ]}
-        onPress={handleFinish}
-        disabled={!selected}
+        onPress={handleContinue}
+        disabled={!canContinue}
         activeOpacity={0.8}
       >
-        <Text style={[styles.buttonText, { opacity: selected ? 1 : 0.5 }]}>
-          Başlayalım! 🚀
+        <Text style={[styles.buttonText, { opacity: canContinue ? 1 : 0.5 }]}>
+          Devam Et
         </Text>
       </TouchableOpacity>
     </View>
@@ -174,76 +131,61 @@ export default function OnboardingStep3() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing['2xl'],
-    paddingBottom: Spacing.xl,
+  },
+  content: {
+    padding: Spacing.lg,
+    paddingTop: Spacing['4xl'],
+    alignItems: 'center',
+    paddingBottom: 100,
   },
   progress: {
     flexDirection: 'row',
-    justifyContent: 'center',
     gap: Spacing.sm,
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing['2xl'],
   },
   progressDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
   },
-  content: {
-    flex: 1,
-  },
   mascot: {
-    fontSize: 60,
-    textAlign: 'center',
-    marginBottom: Spacing.lg,
+    width: 80,
+    height: 80,
+    marginBottom: Spacing.xl,
   },
-  title: {
+  question: {
     fontSize: Typography.sizes['2xl'],
     fontWeight: Typography.weights.bold,
     textAlign: 'center',
+    marginBottom: Spacing.md,
+  },
+  hint: {
+    fontSize: Typography.sizes.sm,
+    textAlign: 'center',
     marginBottom: Spacing.xl,
   },
-  options: {
+  optionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: Spacing.md,
-    marginBottom: Spacing.xl,
+    width: '100%',
   },
   option: {
+    flex: 1,
+    minWidth: '45%',
     padding: Spacing.lg,
     borderRadius: BorderRadius.lg,
     borderWidth: 2,
     alignItems: 'center',
+    gap: Spacing.sm,
   },
-  optionIcon: {
-    fontSize: 48,
-    marginBottom: Spacing.sm,
-  },
-  optionTitle: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: Typography.weights.bold,
-    marginBottom: Spacing.xs,
-  },
-  optionDesc: {
+  optionLabel: {
     fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
     textAlign: 'center',
-  },
-  encouragement: {
-    alignItems: 'center',
-    padding: Spacing.lg,
-  },
-  encouragementMascot: {
-    fontSize: 32,
-    marginBottom: Spacing.sm,
-  },
-  encouragementText: {
-    fontSize: Typography.sizes.base,
-    textAlign: 'center',
-    fontStyle: 'italic',
-    marginBottom: Spacing.xs,
-  },
-  encouragementAuthor: {
-    fontSize: Typography.sizes.sm,
   },
   button: {
+    margin: Spacing.lg,
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.md,
     alignItems: 'center',

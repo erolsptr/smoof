@@ -6,6 +6,7 @@ import {
   Animated,
   Dimensions,
   ScrollView,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState, useEffect, useRef } from 'react';
@@ -24,12 +25,14 @@ export default function CrisisScreen() {
   const { colors } = useColorScheme();
   const router = useRouter();
   const logCrisis = useStatsStore((state) => state.logCrisis);
+  const currentStreak = useStatsStore((state) => state.currentStreak);
+  const userProfile = useUserStore((state) => state.profile);
   
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes = 300 seconds
   const [isBreathing, setIsBreathing] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [showSlipFlow, setShowSlipFlow] = useState(false);
-  const [slipStep, setSlipStep] = useState<'trigger' | 'support'>('trigger');
+  const [slipStep, setSlipStep] = useState<'trigger' | 'support' | 'result'>('trigger');
   const [selectedTrigger, setSelectedTrigger] = useState<string | null>(null);
   const [breathPhase, setBreathPhase] = useState<'inhale' | 'exhale'>('inhale');
   
@@ -105,6 +108,8 @@ export default function CrisisScreen() {
     setSlipStep('trigger');
   };
   
+  const [usedFreeze, setUsedFreeze] = useState(false);
+  
   const handleTriggerSelected = (trigger: string | null) => {
     setSelectedTrigger(trigger);
     setSlipStep('support');
@@ -119,19 +124,33 @@ export default function CrisisScreen() {
         handled: false,
         trigger: selectedTrigger || undefined,
       });
-      router.back();
+      // Freeze used, streak stays, show result
+      setUsedFreeze(true);
+      setSlipStep('result' as any);
     } else {
       await handleContinueWithoutFreeze();
     }
   };
   
   const handleContinueWithoutFreeze = async () => {
+    // Log the crisis
     await logCrisis({
       timestamp: new Date().toISOString(),
       handled: false,
       trigger: selectedTrigger || undefined,
     });
-    router.back();
+    
+    // Record slip (updates daily stats)
+    await useStatsStore.getState().recordSlip(1);
+    
+    // Reset streak by updating quit date to today
+    const today = new Date().toISOString().split('T')[0];
+    await useUserStore.getState().updateProfile({ quitDate: today });
+    useStatsStore.getState().updateStreakFromQuitDate(today);
+    
+    // Show result
+    setUsedFreeze(false);
+    setSlipStep('result' as any);
   };
   
   const handleClose = () => {
@@ -185,6 +204,198 @@ export default function CrisisScreen() {
     );
   }
   
+  // Slip Flow Screen
+  if (showSlipFlow) {
+    const streakFreezesRemaining = (userProfile?.streakFreezes || 0) - (userProfile?.streakFreezesUsed || 0);
+    
+    // Calculate achievements
+    const cigarettesNotSmoked = currentStreak * (userProfile?.dailyCigaretteCount || 0);
+    const moneySaved = Math.floor((cigarettesNotSmoked / 20) * (userProfile?.packPrice || 0));
+    const timeSavedHours = Math.floor((cigarettesNotSmoked * 5) / 60);
+    
+    if (slipStep === 'trigger') {
+      const triggers = [
+        { id: 'stress', label: 'Stres', icon: '😰' },
+        { id: 'social', label: 'Sosyal Ortam', icon: '👥' },
+        { id: 'coffee', label: 'Kahve', icon: '☕' },
+        { id: 'boredom', label: 'Can Sıkıntısı', icon: '😑' },
+        { id: 'habit', label: 'Alışkanlık', icon: '🔄' },
+        { id: 'other', label: 'Diğer', icon: '🤔' },
+      ];
+      
+      return (
+        <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+          <View style={styles.slipContent}>
+            <Image 
+              source={require('../../assets/smoof.png')}
+              style={styles.slipMascotImage}
+              resizeMode="contain"
+            />
+            <Text style={[styles.slipTitle, { color: colors.text }]}>
+              Ne Oldu?
+            </Text>
+            <Text style={[styles.slipSubtitle, { color: colors.textSecondary }]}>
+              Neyin tetiklediğini bilirsek, gelecekte daha hazırlıklı oluruz
+            </Text>
+            
+            <View style={styles.triggerGrid}>
+              {triggers.map((trigger) => (
+                <TouchableOpacity
+                  key={trigger.id}
+                  style={[
+                    styles.triggerButton,
+                    {
+                      backgroundColor: selectedTrigger === trigger.id ? colors.primary : colors.card,
+                      borderColor: selectedTrigger === trigger.id ? colors.primary : colors.cardBorder,
+                    },
+                  ]}
+                  onPress={() => setSelectedTrigger(trigger.id)}
+                >
+                  <Text style={styles.triggerIcon}>{trigger.icon}</Text>
+                  <Text
+                    style={[
+                      styles.triggerLabel,
+                      { color: selectedTrigger === trigger.id ? '#FFFFFF' : colors.text },
+                    ]}
+                  >
+                    {trigger.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            <TouchableOpacity
+              style={[styles.continueButton, { backgroundColor: colors.primary }]}
+              onPress={() => handleTriggerSelected(selectedTrigger)}
+            >
+              <Text style={styles.continueButtonText}>Devam Et</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity onPress={() => handleTriggerSelected(null)}>
+              <Text style={[styles.skipText, { color: colors.textSecondary }]}>
+                Paylaşmak İstemiyorum
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      );
+    }
+    
+    // Support Screen (slipStep === 'support')
+    if (slipStep === 'support') {
+      return (
+        <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+          <View style={styles.slipContent}>
+            <Image 
+              source={require('../../assets/smoof.png')}
+              style={styles.slipMascotImage}
+              resizeMode="contain"
+            />
+            <Text style={[styles.slipTitle, { color: colors.text }]}>
+              Sorun Değil
+            </Text>
+            <Text style={[styles.slipMessage, { color: colors.textSecondary }]}>
+              Bir adım geri atmış olabilirsin, ama <Text style={{ fontWeight: 'bold' }}>streak'in korunuyor</Text>.
+              Önemli olan devam etmen. Sen hala kazanıyorsun!
+            </Text>
+            
+            {/* Achievements */}
+            <View style={[styles.achievementsCard, { backgroundColor: colors.card }]}>
+              <Text style={[styles.achievementsTitle, { color: colors.text }]}>
+                Unutma, sen şimdiye kadar:
+              </Text>
+              <Text style={[styles.achievementItem, { color: colors.textSecondary }]}>
+                🚭 {cigarettesNotSmoked} sigara içmedin
+              </Text>
+              <Text style={[styles.achievementItem, { color: colors.textSecondary }]}>
+                💰 {moneySaved}₺ tasarruf ettin
+              </Text>
+              <Text style={[styles.achievementItem, { color: colors.textSecondary }]}>
+                ⏱️ {timeSavedHours} saat kazandın
+              </Text>
+            </View>
+            
+            {/* Freeze Offer */}
+            {streakFreezesRemaining > 0 ? (
+              <>
+                <TouchableOpacity
+                  style={[styles.freezeButton, { backgroundColor: colors.accent }]}
+                  onPress={handleUseFreeze}
+                >
+                  <Text style={styles.freezeButtonText}>
+                    🧊 Streak Freeze Kullan
+                  </Text>
+                  <Text style={styles.freezeButtonSubtext}>
+                    {streakFreezesRemaining} adet kaldı
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity onPress={handleContinueWithoutFreeze}>
+                  <Text style={[styles.skipText, { color: colors.textSecondary }]}>
+                    Freeze Kullanmadan Devam Et
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <View style={[styles.noFreezeCard, { backgroundColor: colors.card }]}>
+                  <Text style={[styles.noFreezeText, { color: colors.textSecondary }]}>
+                    Streak freeze kalmadı, ama yolculuğun devam ediyor! 💪
+                  </Text>
+                </View>
+                
+                <TouchableOpacity
+                  style={[styles.continueButton, { backgroundColor: colors.primary }]}
+                  onPress={handleContinueWithoutFreeze}
+                >
+                  <Text style={styles.continueButtonText}>Ana Sayfaya Dön</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </ScrollView>
+      );
+    }
+    
+    // Result Screen (slipStep === 'result')
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.resultContent}>
+          <Image 
+            source={require('../../assets/smoof.png')}
+            style={styles.slipMascotImage}
+            resizeMode="contain"
+          />
+          <Text style={[styles.slipTitle, { color: colors.text }]}>
+            {usedFreeze ? 'Streak Korundu!' : 'Yeniden Başlıyoruz'}
+          </Text>
+          <Text style={[styles.slipMessage, { color: colors.textSecondary }]}>
+            {usedFreeze 
+              ? `Streak freeze kullandın! ${currentStreak} günlük streak'in korundu. Devam ediyoruz! 💚`
+              : 'Bugün yeni bir başlangıç. Geçmişe takılma, ileriye bak. Sen yapabilirsin! 🚀'
+            }
+          </Text>
+          
+          <View style={[styles.motivationCard, { backgroundColor: colors.card, marginTop: Spacing.xl }]}>
+            <Text style={[styles.motivationText, { color: colors.text }]}>
+              "Her gün yeni bir şans. Sen her zaman tekrar başlayabilirsin. Ben seninleyim!"
+            </Text>
+            <Text style={[styles.encouragementAuthor, { color: colors.textTertiary, marginTop: Spacing.sm }]}>
+              - Smoof 💚
+            </Text>
+          </View>
+          
+          <TouchableOpacity
+            style={[styles.continueButton, { backgroundColor: colors.primary, marginTop: Spacing.xl }]}
+            onPress={handleClose}
+          >
+            <Text style={styles.continueButtonText}>Ana Sayfaya Dön</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+  
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
@@ -197,16 +408,19 @@ export default function CrisisScreen() {
       {/* Mascot */}
       <View style={styles.mascotContainer}>
         {isBreathing ? (
-          <Animated.Text 
-            style={[
-              styles.mascot, 
-              { transform: [{ scale: breathScale }] }
-            ]}
-          >
-            🦎
-          </Animated.Text>
+          <Animated.View style={{ transform: [{ scale: breathScale }] }}>
+            <Image 
+              source={require('../../assets/smoof.png')}
+              style={styles.mascot}
+              resizeMode="contain"
+            />
+          </Animated.View>
         ) : (
-          <Text style={styles.mascot}>🦎</Text>
+          <Image 
+            source={require('../../assets/smoof.png')}
+            style={styles.mascot}
+            resizeMode="contain"
+          />
         )}
       </View>
       
@@ -295,7 +509,8 @@ const styles = StyleSheet.create({
     marginVertical: Spacing.xl,
   },
   mascot: {
-    fontSize: 100,
+    width: 100,
+    height: 100,
   },
   timerCard: {
     marginHorizontal: Spacing.lg,
@@ -401,9 +616,10 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     paddingTop: Spacing['4xl'],
   },
-  slipMascot: {
-    fontSize: 80,
-    textAlign: 'center' as const,
+  slipMascotImage: {
+    width: 100,
+    height: 100,
+    alignSelf: 'center' as const,
     marginBottom: Spacing.lg,
   },
   slipTitle: {
@@ -500,5 +716,9 @@ const styles = StyleSheet.create({
   },
   noFreezeText: {
     fontSize: Typography.sizes.sm,
+  },
+  encouragementAuthor: {
+    fontSize: Typography.sizes.sm,
+    textAlign: 'center' as const,
   },
 });

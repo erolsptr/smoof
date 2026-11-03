@@ -1,4 +1,4 @@
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, Image } from 'react-native';
 import { Redirect } from 'expo-router';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useUserStore } from '@/store/userStore';
@@ -41,7 +41,11 @@ export default function IndexScreen() {
   if (!isInitialized || isLoading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.primary }]}>
-        <Text style={styles.logo}>🦎</Text>
+        <Image 
+          source={require('../../assets/smoof.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
         <Text style={[styles.title, { color: '#FFFFFF' }]}>Smoof</Text>
         <ActivityIndicator size="large" color="#FFFFFF" style={styles.loader} />
       </View>
@@ -63,7 +67,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logo: {
-    fontSize: 80,
+    width: 120,
+    height: 120,
     marginBottom: 16,
   },
   title: {

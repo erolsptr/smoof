@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function TabsLayout() {
   const { colors } = useColorScheme();
@@ -22,27 +22,29 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Ana Sayfa',
-          tabBarIcon: () => <TabIcon icon="🏠" />,
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="home" size={24} color={(color || colors.textTertiary) as string} />
+          ),
         }}
       />
       <Tabs.Screen
         name="progress"
         options={{
           title: 'İlerleme',
-          tabBarIcon: () => <TabIcon icon="📊" />,
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="stats-chart" size={24} color={(color || colors.textTertiary) as string} />
+          ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profil',
-          tabBarIcon: () => <TabIcon icon="👤" />,
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="person" size={24} color={(color || colors.textTertiary) as string} />
+          ),
         }}
       />
     </Tabs>
   );
-}
-
-function TabIcon({ icon }: { icon: string }) {
-  return <Text style={{ fontSize: 24 }}>{icon}</Text>;
 }
