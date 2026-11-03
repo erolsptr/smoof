@@ -21,13 +21,23 @@ export default function HomeScreen() {
   
   const [activeCard, setActiveCard] = useState(0);
   
-  // Check if quit date is in the future
+  // Check if quit date is in the future or today
   const quitDate = profile?.quitDate ? new Date(profile.quitDate) : null;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const isPreparationMode = quitDate ? quitDate > today : false;
-  const daysUntilQuit = quitDate 
-    ? Math.ceil((quitDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  
+  // Quit date'i de günbaşına al
+  const quitDateNormalized = quitDate ? new Date(quitDate) : null;
+  if (quitDateNormalized) {
+    quitDateNormalized.setHours(0, 0, 0, 0);
+  }
+  
+  const isPreparationMode = quitDateNormalized ? quitDateNormalized > today : false;
+  const isFirstDay = quitDateNormalized ? quitDateNormalized.getTime() === today.getTime() : false;
+  
+  // Gün farkını doğru hesapla
+  const daysUntilQuit = quitDateNormalized && quitDateNormalized > today
+    ? Math.ceil((quitDateNormalized.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
     : 0;
   
   // Animation values
@@ -340,6 +350,118 @@ export default function HomeScreen() {
     );
   }
 
+  // If it's the first day (streak = 0), show special first day screen
+  if (isFirstDay && currentStreak === 0) {
+    return (
+      <ScrollView 
+        style={[styles.container, { backgroundColor: colors.background }]}
+        contentContainerStyle={styles.content}
+      >
+        {/* Mascot & Greeting */}
+        <View style={styles.header}>
+          <Animated.View 
+            style={[
+              styles.avatarPlaceholder,
+              { 
+                backgroundColor: 'transparent',
+                transform: [{ scale: mascotScale }] 
+              }
+            ]}
+          >
+            <Image 
+              source={require('../../../assets/smoof.png')}
+              style={styles.smoofImage}
+              resizeMode="contain"
+            />
+          </Animated.View>
+          <Text style={[styles.greeting, { color: colors.text }]}>
+            Bugün Büyük Gün! 🚀
+          </Text>
+          <Text style={[styles.subGreeting, { color: colors.textSecondary }]}>
+            İlk günün başlıyor, heyecanlı mısın?
+          </Text>
+        </View>
+
+        {/* First Day Card */}
+        <LinearGradient
+          colors={[colors.primary, colors.primaryDark]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.streakCard}
+        >
+          <View style={styles.streakIconContainer}>
+            <Ionicons name="rocket" size={32} color="#FFF" />
+          </View>
+          <Text style={styles.streakLabel}>İLK GÜNÜN</Text>
+          <Text style={styles.firstDayMessage}>
+            Bugün Sigara İçmeden Tamamla
+          </Text>
+          <Text style={styles.firstDaySubMessage}>
+            Streak'ini 1 yapacağız! 💪
+          </Text>
+        </LinearGradient>
+
+        {/* Motivation Card */}
+        <View style={[styles.messageCard, { 
+          backgroundColor: colors.card,
+          borderColor: colors.cardBorder,
+        }]}>
+          <Ionicons name="heart" size={40} color="#FC8181" />
+          <Text style={[styles.messageTitle, { color: colors.text }]}>
+            Sen Yaparsın!
+          </Text>
+          <Text style={[styles.messageText, { color: colors.textSecondary }]}>
+            Her büyük yolculuk ilk adımla başlar. Bugün o ilk adımı atıyorsun! İnanıyorum sana 🌟
+          </Text>
+        </View>
+
+        {/* First Day Tips */}
+        <View style={[styles.tipsCard, { 
+          backgroundColor: colors.card,
+          borderColor: colors.cardBorder,
+        }]}>
+          <View style={styles.tipHeader}>
+            <Ionicons name="shield-checkmark" size={24} color="#10B981" />
+            <Text style={[styles.tipsTitle, { color: colors.text }]}>
+              Bugün İçin İpuçları
+            </Text>
+          </View>
+          
+          <View style={styles.tipsList}>
+            <View style={styles.tipItem}>
+              <View style={[styles.tipBullet, { backgroundColor: colors.primary }]} />
+              <Text style={[styles.tipText, { color: colors.textSecondary }]}>
+                Sigara içme isteği geldiğinde kriz modunu kullan
+              </Text>
+            </View>
+            <View style={styles.tipItem}>
+              <View style={[styles.tipBullet, { backgroundColor: colors.primary }]} />
+              <Text style={[styles.tipText, { color: colors.textSecondary }]}>
+                Bol bol su iç, vücudun detoks oluyor
+              </Text>
+            </View>
+            <View style={styles.tipItem}>
+              <View style={[styles.tipBullet, { backgroundColor: colors.primary }]} />
+              <Text style={[styles.tipText, { color: colors.textSecondary }]}>
+                Günün sonunda kendini ödüllendir!
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Crisis Button */}
+        <TouchableOpacity
+          style={[styles.crisisButton, { backgroundColor: colors.error }]}
+          activeOpacity={0.8}
+          onPress={() => router.push('/crisis')}
+        >
+          <Ionicons name="alert-circle" size={24} color="#FFFFFF" />
+          <Text style={styles.crisisText}>Sigara İçmek İstiyorum</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    );
+  }
+
   return (
     <ScrollView 
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -589,6 +711,19 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.9)',
     fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
+  },
+  firstDayMessage: {
+    color: '#FFFFFF',
+    fontSize: Typography.sizes.xl,
+    fontWeight: Typography.weights.bold,
+    textAlign: 'center',
+    marginTop: Spacing.md,
+  },
+  firstDaySubMessage: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: Typography.sizes.base,
+    textAlign: 'center',
+    marginTop: Spacing.xs,
   },
   carouselContainer: {
     marginBottom: Spacing.lg,
