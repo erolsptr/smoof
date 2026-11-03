@@ -56,22 +56,21 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       // Request permissions and get token
       const token = await NotificationService.registerForPushNotificationsAsync();
       
-      if (token) {
-        set((state) => ({
-          settings: { ...state.settings, pushToken: token },
-          isInitialized: true,
-        }));
-        
-        await storage.setItem(STORAGE_KEYS.NOTIFICATION_SETTINGS, {
-          ...get().settings,
-          pushToken: token,
-        });
-        
-        // Schedule initial notifications
-        await get().rescheduleAll();
-      }
+      // Token olsa da olmasa da devam et
+      set((state) => ({
+        settings: token ? { ...state.settings, pushToken: token } : state.settings,
+        isInitialized: true,
+      }));
+      
+      const currentSettings = get().settings;
+      await storage.setItem(STORAGE_KEYS.NOTIFICATION_SETTINGS, currentSettings);
+      
+      // Schedule initial notifications
+      await get().rescheduleAll();
     } catch (error) {
       console.error('Failed to initialize notifications:', error);
+      // Yine de initialized olarak işaretle ki kullanıcı ayarlara girebilsin
+      set({ isInitialized: true });
     }
   },
   

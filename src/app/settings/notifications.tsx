@@ -1,32 +1,59 @@
-import { View, Text, StyleSheet, ScrollView, Switch, TouchableOpacity, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Switch, TouchableOpacity, Alert, Platform, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useNotificationStore } from '@/store/notificationStore';
 import { Spacing, Typography, BorderRadius } from '@/constants';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function NotificationSettingsScreen() {
   const { colors } = useColorScheme();
   const router = useRouter();
   const { settings, updateSettings, toggleNotifications, isInitialized, initializeNotifications } = useNotificationStore();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isInitialized) {
-      initializeNotifications();
+      handleInitialize();
     }
   }, [isInitialized]);
 
-  const handleToggleMain = async (value: boolean) => {
-    if (value && !isInitialized) {
+  const handleInitialize = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
       await initializeNotifications();
-    } else {
-      await toggleNotifications(value);
+    } catch (err) {
+      console.error('Init error:', err);
+      setError('Bildirimler başlatılamadı. Lütfen cihaz ayarlarından izinleri kontrol edin.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleToggleMain = async (value: boolean) => {
+    try {
+      setError(null);
+      if (value && !isInitialized) {
+        await handleInitialize();
+      } else {
+        await toggleNotifications(value);
+      }
+    } catch (err) {
+      console.error('Toggle error:', err);
+      setError('Bildirim ayarları güncellenemedi.');
     }
   };
 
   const handleToggleSetting = async (key: keyof typeof settings, value: boolean) => {
-    await updateSettings({ [key]: value });
+    try {
+      setError(null);
+      await updateSettings({ [key]: value });
+    } catch (err) {
+      console.error('Setting toggle error:', err);
+      setError('Ayar güncellenemedi.');
+    }
   };
 
   const handleEditTime = (type: 'motivation' | 'reflection') => {
@@ -80,6 +107,26 @@ export default function NotificationSettingsScreen() {
         style={styles.content}
         contentContainerStyle={styles.scrollContent}
       >
+        {/* Loading State */}
+        {isLoading && (
+          <View style={[styles.loadingContainer, { backgroundColor: colors.card }]}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.loadingText, { color: colors.text }]}>
+              Bildirimler hazırlanıyor...
+            </Text>
+          </View>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <View style={[styles.errorBox, { backgroundColor: colors.error + '10' }]}>
+            <Ionicons name="warning" size={20} color={colors.error} />
+            <Text style={[styles.errorText, { color: colors.error }]}>
+              {error}
+            </Text>
+          </View>
+        )}
+
         {/* Main Toggle */}
         <View style={[styles.card, { backgroundColor: colors.card }]}>
           <View style={styles.settingRow}>
@@ -359,5 +406,29 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: Typography.sizes.sm,
     lineHeight: Typography.sizes.sm * 1.5,
+  },
+  loadingContainer: {
+    padding: Spacing.xl,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+    gap: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  loadingText: {
+    fontSize: Typography.sizes.base,
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.md,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: Typography.sizes.sm,
+    lineHeight: Typography.sizes.sm * 1.5,
+    fontWeight: Typography.weights.semibold,
   },
 });

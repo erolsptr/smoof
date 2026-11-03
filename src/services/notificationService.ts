@@ -50,7 +50,12 @@ export async function registerForPushNotificationsAsync(): Promise<string | unde
 
     try {
       const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-      token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+      if (projectId && projectId !== 'your-project-id') {
+        token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+      } else {
+        // For development/Expo Go, get device push token
+        token = (await Notifications.getDevicePushTokenAsync()).data;
+      }
     } catch (error) {
       console.error('Error getting push token:', error);
     }
