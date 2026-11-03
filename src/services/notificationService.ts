@@ -164,7 +164,7 @@ export async function scheduleMilestoneCelebration(days: number, delaySeconds: n
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
       seconds: delaySeconds,
-    },
+    } as Notifications.TimeIntervalTriggerInput,
   });
 }
 

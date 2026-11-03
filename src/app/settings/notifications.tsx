@@ -5,6 +5,7 @@ import { useNotificationStore } from '@/store/notificationStore';
 import { Spacing, Typography, BorderRadius } from '@/constants';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
+import * as Notifications from 'expo-notifications';
 
 export default function NotificationSettingsScreen() {
   const { colors } = useColorScheme();
@@ -88,6 +89,41 @@ export default function NotificationSettingsScreen() {
         },
       ]
     );
+  };
+
+  const handleTestNotification = async (type: string) => {
+    const { scheduleMilestoneCelebration, scheduleDailyMotivation, scheduleWaterReminders, scheduleEveningReflection, scheduleCriticalHourSupport } = await import('@/services/notificationService');
+    
+    try {
+      switch (type) {
+        case 'instant':
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: '🧪 Test Bildirimi',
+              body: 'Bu bir test bildirimidir. Bildirimler çalışıyor! 🎉',
+              data: { type: 'test' },
+            },
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+              seconds: 2,
+            } as Notifications.TimeIntervalTriggerInput,
+          });
+          Alert.alert('✅ Başarılı', '2 saniye sonra bildirim gelecek!');
+          break;
+        case 'milestone':
+          await scheduleMilestoneCelebration(1, 3);
+          Alert.alert('✅ Başarılı', '3 saniye sonra milestone bildirimi gelecek!');
+          break;
+        case 'motivation':
+          await scheduleDailyMotivation(new Date().getHours(), new Date().getMinutes() + 1);
+          Alert.alert('✅ Başarılı', '1 dakika sonra motivasyon bildirimi gelecek!');
+          break;
+        default:
+          break;
+      }
+    } catch (error) {
+      Alert.alert('❌ Hata', 'Bildirim gönderilemedi: ' + error);
+    }
   };
 
   return (
@@ -301,6 +337,44 @@ export default function NotificationSettingsScreen() {
                 Bildirimler sigarayı bırakma yolculuğunda sana destek olmak için tasarlandı. İstediğin zaman değiştirebilirsin.
               </Text>
             </View>
+
+            {/* Test Section */}
+            <View style={[styles.testSection, { backgroundColor: colors.card }]}>
+              <View style={styles.testHeader}>
+                <Ionicons name="flask" size={20} color={colors.secondary} />
+                <Text style={[styles.testTitle, { color: colors.text }]}>
+                  Bildirimleri Test Et 🧪
+                </Text>
+              </View>
+              
+              <TouchableOpacity
+                style={[styles.testButton, { backgroundColor: colors.primary }]}
+                onPress={() => handleTestNotification('instant')}
+              >
+                <Ionicons name="notifications" size={20} color="#FFF" />
+                <Text style={styles.testButtonText}>Hemen Gönder (2 sn)</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.testButton, { backgroundColor: colors.secondary }]}
+                onPress={() => handleTestNotification('milestone')}
+              >
+                <Ionicons name="trophy" size={20} color="#FFF" />
+                <Text style={styles.testButtonText}>Milestone (3 sn)</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.testButton, { backgroundColor: '#F59E0B' }]}
+                onPress={() => handleTestNotification('motivation')}
+              >
+                <Ionicons name="sunny" size={20} color="#FFF" />
+                <Text style={styles.testButtonText}>Motivasyon (1 dk)</Text>
+              </TouchableOpacity>
+
+              <Text style={[styles.testHint, { color: colors.textSecondary }]}>
+                💡 Uygulamayı arka plana al ve bekle
+              </Text>
+            </View>
           </>
         )}
       </ScrollView>
@@ -430,5 +504,44 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.sm,
     lineHeight: Typography.sizes.sm * 1.5,
     fontWeight: Typography.weights.semibold,
+  },
+  testSection: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    marginTop: Spacing.lg,
+    gap: Spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  testHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  testTitle: {
+    fontSize: Typography.sizes.base,
+    fontWeight: Typography.weights.bold,
+  },
+  testButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+  },
+  testButtonText: {
+    color: '#FFFFFF',
+    fontSize: Typography.sizes.base,
+    fontWeight: Typography.weights.semibold,
+  },
+  testHint: {
+    fontSize: Typography.sizes.sm,
+    textAlign: 'center',
+    marginTop: Spacing.xs,
   },
 });
