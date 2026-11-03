@@ -1,57 +1,79 @@
-# 🦎 Smoof - Sigarayı Bırakma Uygulaması
+# 🌿 Smoof - Sigarayı Bırakma Uygulaması
 
-**Smoof**, sigarayı tamamen bırakmak veya kademeli azaltmak isteyenlere yardımcı olan ücretsiz mobil uygulamadır.
+Smoof, sigarayı bırakma yolculuğunda yanınızda olan, Türkçe bir mobil uygulamadır. React Native ve Expo ile geliştirilmiştir.
 
-## 🎯 Özellikler
+## ✨ Özellikler
 
-### ✅ Mevcut (v0.1.0 - Core)
-- 🎨 Duolingo-tarzı renkli arayüz (açık/koyu tema)
-- 🦎 Smoof maskotu
-- 📊 Streak (sigarasız gün) sayacı
-- 💰 Para tasarrufu hesaplayıcı
-- 🚭 İçilmeyen sigara sayacı
-- 📝 Basit onboarding akışı (3 adım)
-- 🎮 Streak dondurucu sistemi
+### 🎯 Temel Özellikler
+- **Adım Adım Onboarding**: Kullanıcı dostu, hafif sorularla başlangıç
+- **Branching Logic**: Tamamen bırak veya kademeli azalt seçenekleri
+- **Hazırlık Modu**: Gelecek tarihte başlayacaklar için özel ekran
+- **Streak Takibi**: Sigarasız geçen günleri takip et
+- **Tasarruf Hesaplayıcı**: Biriktirdiğin parayı gör
+- **Milestone Sistemi**: 1, 3, 7, 14, 30, 90, 180, 365 gün başarıları
 
-### 🚧 Planlanan (Sonraki Sürümler)
-- 🆘 Kriz modu (nefes egzersizi, mini oyun, motivasyon)
-- 🏆 Rozet ve başarı sistemi
-- 📈 Detaylı ilerleme grafikleri
-- 📱 Widget desteği
-- ⌚ Apple Watch entegrasyonu
-- 🤖 AI koçu
-- 📊 Haftalık raporlar
-- 👥 Arkadaş desteği
+### 🚨 Kriz Yönetimi
+- **Kriz Modu**: Sigara içme isteği geldiğinde anında destek
+- **Slip Flow**: Kayma durumunda streak freeze sistemi
+- **Motivasyon Sözleri**: Smoof karakteri ile samimi konuşmalar
 
-## 🛠️ Teknoloji Stack
+### 📊 İlerleme & İstatistikler
+- **Günlük Takip**: İçilmeyen sigara, tasarruf, kazanılan zaman
+- **Sağlık Faydaları**: Vücudunda iyileşen sistemleri gör
+- **İlerleme Ekranı**: Detaylı milestone'lar ve sağlık timeline'ı
 
-- **Framework:** React Native + Expo (SDK 58)
-- **Dil:** TypeScript
-- **Routing:** Expo Router (file-based)
-- **State Management:** Zustand
-- **Veritabanı:** Expo SQLite (çevrimdışı)
-- **Animasyonlar:** React Native Reanimated
-- **Backend (gelecek):** Supabase
+### 🔔 Bildirimler
+- **Günlük Motivasyon**: Her sabah farklı bir motivasyon mesajı
+- **Milestone Kutlamaları**: Başarıları kutlayan bildirimler
+- **Kritik Saatler**: Genelde içtiğin saatlerde destek mesajları
+- **Su Hatırlatıcıları**: Detoks için su içmeyi hatırlat
+- **Akşam Değerlendirmesi**: Günü değerlendirme bildirimi
+- **Başlangıç Günü**: Hazırlık modundayken hatırlatıcılar
 
-## 🚀 Kurulum
+### 👤 Profil & Ayarlar
+- **Kişiselleştirme**: Motivasyonlarını ve hedeflerini belirle
+- **Test Modu**: Geliştirici araçları (gizli)
+- **Bildirim Ayarları**: Tüm bildirimleri özelleştir
+
+### 🦎 Smoof Karakteri
+- Samimi, destekleyici maskot karakteri
+- AI-generated turquoise chameleon
+- Tüm ekranlarda kullanıcıyla etkileşim
+
+## 🛠 Teknolojiler
+
+- **React Native** - Mobil framework
+- **Expo SDK 58** - Development platform
+- **TypeScript** - Type safety
+- **Expo Router** - File-based navigation
+- **Zustand** - State management
+- **AsyncStorage** - Local persistence
+- **Expo Notifications** - Push notifications
+- **Expo Linear Gradient** - Gradients
+- **@react-native-community/datetimepicker** - Date selection
+- **Ionicons** - Icons
+
+## 📱 Kurulum
 
 ### Gereksinimler
 - Node.js 18+
-- npm veya yarn
-- iOS için: macOS + Xcode
-- Android için: Android Studio
+- npm veya bun
+- Expo Go app (test için) veya
+- Android Studio / Xcode (native build için)
 
 ### Adımlar
 
-1. **Repoyu klonla**
+1. **Depoyu klonla**
 ```bash
-git clone <repo-url>
+git clone https://github.com/erolsptr/smoof.git
 cd smoof
 ```
 
 2. **Bağımlılıkları yükle**
 ```bash
 npm install
+# veya
+bun install
 ```
 
 3. **Geliştirme sunucusunu başlat**
@@ -59,20 +81,14 @@ npm install
 npx expo start
 ```
 
-4. **Test et**
-- **iOS:** `i` tuşuna bas veya Expo Go uygulamasında QR kodu tara
-- **Android:** `a` tuşuna bas veya Expo Go uygulamasında QR kodu tara
-- **Web:** `w` tuşuna bas (sınırlı destek)
+4. **Uygulamayı çalıştır**
+- **iOS Simulator**: `i` tuşuna bas
+- **Android Emulator**: `a` tuşuna bas
+- **Fiziksel cihaz**: QR kodu Expo Go ile tara
 
-## 📱 Uygulamayı Çalıştırma
+## 🚀 Build & Deploy
 
-### Expo Go ile (Geliştirme)
-```bash
-npx expo start
-```
-Telefonunda **Expo Go** uygulamasını indir ve QR kodu tara.
-
-### Development Build ile
+### Development Build
 ```bash
 # iOS
 npx expo run:ios
@@ -83,29 +99,15 @@ npx expo run:android
 
 ### Production Build (EAS)
 ```bash
-# İlk kurulum
+# Install EAS CLI
 npm install -g eas-cli
-eas login
+
+# Configure
 eas build:configure
 
-# iOS build
+# Build
 eas build --platform ios
-
-# Android build
 eas build --platform android
-```
-
-## 🧪 Test & QA
-
-```bash
-# TypeScript kontrolü
-npx tsc --noEmit
-
-# Lint (henüz yapılandırılmadı)
-npx expo lint
-
-# Proje sağlık kontrolü
-npx expo-doctor
 ```
 
 ## 📂 Proje Yapısı
@@ -113,75 +115,88 @@ npx expo-doctor
 ```
 smoof/
 ├── src/
-│   ├── app/                 # Expo Router ekranları
-│   │   ├── _layout.tsx      # Root layout
-│   │   ├── index.tsx        # Splash/router
-│   │   ├── onboarding/      # Onboarding akışı
-│   │   │   ├── index.tsx    # Hoş geldin
-│   │   │   ├── step1.tsx    # Sigara bilgisi
-│   │   │   ├── step2.tsx    # Bırakma yöntemi
-│   │   │   └── step3.tsx    # Başlangıç tarihi
-│   │   └── (tabs)/          # Ana uygulama (tab navigation)
-│   │       ├── index.tsx    # Ana sayfa (dashboard)
-│   │       ├── progress.tsx # İlerleme ekranı
-│   │       └── profile.tsx  # Profil & ayarlar
-│   │
-│   ├── components/          # Yeniden kullanılabilir componentler
-│   ├── constants/           # Renkler, tipografi, spacing
-│   ├── hooks/               # Custom hooks (useColorScheme)
-│   ├── store/               # Zustand stores
-│   │   ├── userStore.ts     # Kullanıcı profili
-│   │   └── statsStore.ts    # İstatistikler
-│   ├── types/               # TypeScript tipleri
-│   ├── services/            # API ve veritabanı servisleri (gelecek)
-│   └── utils/               # Yardımcı fonksiyonlar
-│
-├── assets/                  # Görseller, fontlar, iconlar
-├── app.json                 # Expo konfigürasyonu
-└── tsconfig.json            # TypeScript konfigürasyonu
+│   ├── app/              # Expo Router pages
+│   │   ├── (tabs)/       # Tab navigation
+│   │   │   ├── index.tsx      # Ana ekran
+│   │   │   ├── progress.tsx   # İlerleme
+│   │   │   └── profile.tsx    # Profil
+│   │   ├── onboarding/   # Onboarding akışı
+│   │   │   ├── index.tsx      # Welcome
+│   │   │   ├── step1.tsx      # Günlük sigara
+│   │   │   ├── step2.tsx      # Paket fiyatı
+│   │   │   ├── step3.tsx      # Motivasyon
+│   │   │   ├── step4.tsx      # Yöntem (branching)
+│   │   │   ├── step5.tsx      # Kademeli plan
+│   │   │   └── step6.tsx      # Başlangıç tarihi
+│   │   ├── settings/     # Ayarlar
+│   │   │   └── notifications.tsx
+│   │   ├── crisis.tsx    # Kriz modu
+│   │   └── _layout.tsx   # Root layout
+│   ├── components/       # Reusable components
+│   ├── constants/        # Sabitler (colors, spacing, typography)
+│   ├── hooks/            # Custom hooks
+│   ├── services/         # Services
+│   │   └── notificationService.ts
+│   ├── store/            # Zustand stores
+│   │   ├── userStore.ts
+│   │   ├── statsStore.ts
+│   │   ├── onboardingStore.ts
+│   │   └── notificationStore.ts
+│   ├── types/            # TypeScript types
+│   └── utils/            # Utility functions
+├── assets/               # Images, fonts, icons
+│   └── smoof.png        # Maskot karakteri
+├── app.json             # Expo config
+├── package.json
+└── tsconfig.json
 ```
 
-## 🎨 Tasarım Sistemi
+## 🧪 Test Modu
 
-### Renk Paleti
-- **Primary (Yeşil):** Başarı, büyüme (#10B981)
-- **Secondary (Sarı/Turuncu):** Enerji, motivasyon (#F59E0B)
-- **Accent (Mavi):** Sakinlik, kriz modu (#3B82F6)
+Uygulamada gizli bir test modu var:
 
-### Tipografi
-- **Fontlar:** System default (SF Pro iOS, Roboto Android)
-- **Boyutlar:** xs(12) → 5xl(48)
-- **Ağırlıklar:** normal, medium, semibold, bold, extrabold
+1. Profil ekranına git
+2. Smoof avatar'ına 5 kez tıkla
+3. Test modu açılır
+4. Geçmiş ve gelecek tarihler test edebilirsin
 
-### Spacing Scale
-- xs(4), sm(8), md(16), lg(24), xl(32), 2xl(40), 3xl(48), 4xl(64)
+## 🎨 Tasarım Kararları
 
-## 🔐 Veri Güvenliği
+- **Renkler**: Turquoise/teal (#4ECDC4) - sakinleştirici, sağlık odaklı
+- **Tipografi**: System fonts - okunabilirlik
+- **Iconlar**: Ionicons - tutarlılık
+- **Animasyonlar**: Minimal ama anlamlı - streak, milestone kutlamaları
+- **Dil**: Samimi, destekleyici, "sen" dili kullanımı
 
-- ✅ Tüm veriler cihazda saklanır (SQLite)
-- ✅ KVKK uyumlu
-- ✅ Çevrimdışı çalışır
-- ⏳ Gelecekte: Supabase ile opsiyonel bulut yedekleme
+## 🔒 Gizlilik
 
-## 📝 Lisans
-
-Bu proje henüz bir lisansa sahip değil. Geliştirme aşamasında.
+- Tüm veriler cihazda saklanır (AsyncStorage)
+- Sunucuya veri gönderilmez
+- Push notification token sadece bildirimler için kullanılır
 
 ## 🤝 Katkıda Bulunma
 
-Henüz açık kaynak değil. İleride topluluk katkısına açılabilir.
+1. Fork'la
+2. Feature branch oluştur (`git checkout -b feature/amazing-feature`)
+3. Commit'le (`git commit -m 'feat: add amazing feature'`)
+4. Push'la (`git push origin feature/amazing-feature`)
+5. Pull Request aç
 
-## 📧 İletişim
+## 📝 Lisans
 
-Sorular için: [İletişim bilgisi eklenecek]
+MIT License - detaylar için [LICENSE](LICENSE) dosyasına bakın.
+
+## 👨‍💻 Geliştirici
+
+**Erol Saptır**
+- GitHub: [@erolsptr](https://github.com/erolsptr)
+
+## 🙏 Teşekkürler
+
+- Smoof karakterini AI ile oluşturmada yardımcı olan Microsoft Copilot
+- React Native ve Expo topluluğu
+- Sigarayı bırakma yolculuğundaki tüm savaşçılar
 
 ---
 
-**Not:** Bu proje aktif geliştirme aşamasındadır. İlk stable sürüm (v1.0) için roadmap:
-1. ✅ Core özellikler (v0.1)
-2. 🚧 Kriz modu + oyunlaştırma (v0.2)
-3. 🚧 SQLite entegrasyonu (v0.3)
-4. 🚧 Grafikler ve analizler (v0.4)
-5. 🚧 Widget + bildirimler (v0.5)
-6. 🚧 Beta test + polish (v0.9)
-7. 🎉 Public release (v1.0)
+Made with 💚 by Smoof Team

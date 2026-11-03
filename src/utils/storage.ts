@@ -47,4 +47,5 @@ export const STORAGE_KEYS = {
   DAILY_STATS: '@smoof:daily_stats',
   CRISIS_LOGS: '@smoof:crisis_logs',
   ONBOARDING_COMPLETED: '@smoof:onboarding_completed',
+  NOTIFICATION_SETTINGS: '@smoof:notification_settings',
 } as const;

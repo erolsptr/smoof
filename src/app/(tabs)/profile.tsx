@@ -225,7 +225,10 @@ export default function ProfileScreen() {
         </Text>
         
         <View style={[styles.settingsCard, { backgroundColor: colors.card }]}>
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={() => router.push('/settings/notifications')}
+          >
             <View style={styles.settingLeft}>
               <Ionicons name="notifications" size={20} color={colors.textSecondary} />
               <Text style={[styles.settingLabel, { color: colors.text }]}>
