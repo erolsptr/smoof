@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Modal, TextInput, Platform } from 'react-native';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useUserStore } from '@/store/userStore';
 import { useStatsStore } from '@/store/statsStore';
@@ -25,6 +25,8 @@ export default function ProfileScreen() {
 
   const [testModeVisible, setTestModeVisible] = useState(false);
   const [testTapCount, setTestTapCount] = useState(0);
+  const [packPriceModalVisible, setPackPriceModalVisible] = useState(false);
+  const [newPackPrice, setNewPackPrice] = useState('');
 
   if (!profile) {
     return (
@@ -65,6 +67,53 @@ export default function ProfileScreen() {
         ? `Hazırlık Modu: ${Math.abs(daysAgo)} gün kaldı\nTarih: ${newQuitDate}`
         : `Streak: ${daysAgo} gün\nTarih: ${newQuitDate}`
     );
+  };
+
+  const handlePackPriceUpdate = () => {
+    if (Platform.OS === 'ios') {
+      Alert.prompt(
+        'Paket Fiyatı Güncelle',
+        `Şu anki fiyat: ₺${profile.packPrice}\n\nYeni fiyat (₺):`,
+        [
+          { text: 'İptal', style: 'cancel' },
+          {
+            text: 'Güncelle',
+            onPress: async (newPrice) => {
+              const price = parseFloat(newPrice || '');
+              if (!isNaN(price) && price > 0) {
+                await updateProfile({ packPrice: price });
+                Alert.alert(
+                  '✅ Güncellendi',
+                  `Yeni paket fiyatı: ₺${price}\n\nTasarruf hesaplamaları bu fiyata göre yapılacak.`
+                );
+              } else {
+                Alert.alert('Hata', 'Geçerli bir fiyat gir.');
+              }
+            }
+          }
+        ],
+        'plain-text',
+        profile.packPrice.toString()
+      );
+    } else {
+      // Android: show custom modal
+      setNewPackPrice(profile.packPrice.toString());
+      setPackPriceModalVisible(true);
+    }
+  };
+
+  const handlePackPriceSubmit = async () => {
+    const price = parseFloat(newPackPrice);
+    if (!isNaN(price) && price > 0) {
+      await updateProfile({ packPrice: price });
+      setPackPriceModalVisible(false);
+      Alert.alert(
+        '✅ Güncellendi',
+        `Yeni paket fiyatı: ₺${price}\n\nTasarruf hesaplamaları bu fiyata göre yapılacak.`
+      );
+    } else {
+      Alert.alert('Hata', 'Geçerli bir fiyat gir.');
+    }
   };
 
   const handleResetApp = () => {
@@ -320,6 +369,47 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      {/* Cigarette Information */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          Sigara Bilgileri
+        </Text>
+        
+        <View style={[styles.menuCard, { backgroundColor: colors.card }]}>
+          {/* Pack Price */}
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handlePackPriceUpdate}
+          >
+            <Ionicons name="cash-outline" size={24} color={colors.primary} />
+            <View style={styles.menuItemContent}>
+              <Text style={[styles.menuItemTitle, { color: colors.text }]}>
+                Paket Fiyatı
+              </Text>
+              <Text style={[styles.menuItemValue, { color: colors.textSecondary }]}>
+                ₺{profile.packPrice}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+          </TouchableOpacity>
+
+          <View style={[styles.divider, { backgroundColor: colors.cardBorder }]} />
+
+          {/* Daily Cigarette Count */}
+          <View style={styles.menuItem}>
+            <Ionicons name="bar-chart-outline" size={24} color={colors.secondary} />
+            <View style={styles.menuItemContent}>
+              <Text style={[styles.menuItemTitle, { color: colors.text }]}>
+                Günlük Sigara Sayısı
+              </Text>
+              <Text style={[styles.menuItemValue, { color: colors.textSecondary }]}>
+                {profile.dailyCigaretteCount} adet
+              </Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
       {/* Settings */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
@@ -502,6 +592,73 @@ export default function ProfileScreen() {
           Made with 💚 by Smoof Team
         </Text>
       </View>
+
+      {/* Pack Price Input Modal (Android) */}
+      <Modal
+        visible={packPriceModalVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
+            {/* Icon Circle */}
+            <View style={[styles.modalIconCircle, { backgroundColor: colors.primary + '20' }]}>
+              <Ionicons name="cash-outline" size={48} color={colors.primary} />
+            </View>
+
+            {/* Title */}
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              Paket Fiyatı Güncelle
+            </Text>
+
+            {/* Current Price Info */}
+            <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
+              Şu anki fiyat: ₺{profile.packPrice}
+            </Text>
+
+            {/* Input */}
+            <View style={[styles.inputContainer, { backgroundColor: colors.background, borderColor: colors.cardBorder }]}>
+              <Text style={[styles.inputPrefix, { color: colors.textSecondary }]}>₺</Text>
+              <TextInput
+                style={[styles.input, { color: colors.text }]}
+                value={newPackPrice}
+                onChangeText={setNewPackPrice}
+                keyboardType="decimal-pad"
+                placeholder="0.00"
+                placeholderTextColor={colors.textTertiary}
+                autoFocus
+              />
+            </View>
+
+            {/* Info Message */}
+            <Text style={[styles.modalInfo, { color: colors.textSecondary }]}>
+              Tasarruf hesaplamaları yeni fiyata göre yapılacak.
+            </Text>
+
+            {/* Buttons */}
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: colors.primary }]}
+                onPress={handlePackPriceSubmit}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalButtonText}>Güncelle</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButtonSecondary, { borderColor: colors.textSecondary }]}
+                onPress={() => setPackPriceModalVisible(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.modalButtonSecondaryText, { color: colors.textSecondary }]}>
+                  İptal
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -728,5 +885,123 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: Typography.sizes.xs,
+  },
+  menuCard: {
+    borderRadius: BorderRadius.lg,
+    overflow: 'hidden',
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    gap: Spacing.md,
+  },
+  menuItemContent: {
+    flex: 1,
+  },
+  menuItemTitle: {
+    fontSize: Typography.sizes.base,
+    fontWeight: Typography.weights.semibold,
+    marginBottom: Spacing.xs,
+  },
+  menuItemValue: {
+    fontSize: Typography.sizes.sm,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.xl,
+  },
+  modalContainer: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing['2xl'],
+    alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 12,
+      },
+    }),
+  },
+  modalIconCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.lg,
+  },
+  modalTitle: {
+    fontSize: Typography.sizes['2xl'],
+    fontWeight: Typography.weights.bold,
+    marginBottom: Spacing.xs,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: Typography.sizes.sm,
+    marginBottom: Spacing.lg,
+    textAlign: 'center',
+  },
+  inputContainer: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: BorderRadius.md,
+    borderWidth: 2,
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  inputPrefix: {
+    fontSize: Typography.sizes.xl,
+    fontWeight: Typography.weights.bold,
+    marginRight: Spacing.xs,
+  },
+  input: {
+    flex: 1,
+    fontSize: Typography.sizes.xl,
+    fontWeight: Typography.weights.semibold,
+    paddingVertical: Spacing.md,
+  },
+  modalInfo: {
+    fontSize: Typography.sizes.xs,
+    textAlign: 'center',
+    marginBottom: Spacing.xl,
+    lineHeight: Typography.sizes.xs * 1.5,
+  },
+  modalButtons: {
+    width: '100%',
+    gap: Spacing.sm,
+  },
+  modalButton: {
+    width: '100%',
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: '#FFFFFF',
+    fontSize: Typography.sizes.base,
+    fontWeight: Typography.weights.bold,
+  },
+  modalButtonSecondary: {
+    width: '100%',
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    borderWidth: 2,
+    backgroundColor: 'transparent',
+  },
+  modalButtonSecondaryText: {
+    fontSize: Typography.sizes.base,
+    fontWeight: Typography.weights.semibold,
   },
 });
