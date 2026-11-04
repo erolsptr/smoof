@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Image, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useUserStore } from '@/store/userStore';
@@ -645,6 +645,33 @@ export default function HomeScreen() {
             </View>
           </View>
         )}
+
+        {/* Freeze Info Card */}
+        <View style={[styles.freezeCard, { 
+          backgroundColor: colors.card,
+          borderColor: colors.cardBorder,
+        }]}>
+          <View style={styles.freezeHeader}>
+            <Ionicons name="snow" size={24} color={colors.accent} />
+            <Text style={[styles.freezeTitle, { color: colors.text }]}>
+              Streak Freeze
+            </Text>
+            <TouchableOpacity 
+              onPress={() => {
+                Alert.alert(
+                  'Streak Freeze Nedir?',
+                  'Hedef aşıldığında kullanılır. Disiplin günü streakini korur ve sıfırlanmasını engeller.',
+                  [{ text: 'Tamam' }]
+                );
+              }}
+            >
+              <Ionicons name="information-circle-outline" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          <Text style={[styles.freezeCount, { color: colors.accent }]}>
+            {profile.streakFreezes - profile.streakFreezesUsed} / {profile.streakFreezes} kaldı
+          </Text>
+        </View>
 
         {/* Reduction Progress */}
         <View style={[styles.reductionCard, { 
@@ -1341,6 +1368,28 @@ const styles = StyleSheet.create({
   smokeFreeValue: {
     fontSize: Typography.sizes.xl,
     fontWeight: Typography.weights.bold,
+  },
+  freezeCard: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+    gap: Spacing.xs,
+  },
+  freezeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  freezeTitle: {
+    fontSize: Typography.sizes.base,
+    fontWeight: Typography.weights.semibold,
+    flex: 1,
+  },
+  freezeCount: {
+    fontSize: Typography.sizes.lg,
+    fontWeight: Typography.weights.bold,
+    marginLeft: Spacing.lg + Spacing.sm,
   },
   reductionCard: {
     padding: Spacing.lg,

@@ -108,6 +108,8 @@ export default function CrisisScreen() {
     setSlipStep('trigger');
   };
   
+  const isGradualMode = userProfile?.quitMethod === 'gradual';
+  
   const [usedFreeze, setUsedFreeze] = useState(false);
   
   const handleTriggerSelected = (trigger: string | null) => {
@@ -475,17 +477,22 @@ export default function CrisisScreen() {
           <Text style={styles.actionButtonText}>💪 Direndim</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: colors.error, opacity: 0.7 }]}
-          onPress={handleGaveIn}
-        >
-          <Text style={styles.actionButtonText}>😔 İçtim</Text>
-        </TouchableOpacity>
+        {!isGradualMode && (
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: colors.error, opacity: 0.7 }]}
+            onPress={handleGaveIn}
+          >
+            <Text style={styles.actionButtonText}>😔 İçtim</Text>
+          </TouchableOpacity>
+        )}
       </View>
       
       {/* Helper text */}
       <Text style={[styles.helperText, { color: colors.textTertiary }]}>
-        "Direndim" butonuna basmak için 5 dakika beklemelisin
+        {isGradualMode 
+          ? 'İsteğin geçene kadar diren. Sen yapabilirsin! 💪'
+          : '"Direndim" butonuna basmak için 5 dakika beklemelisin'
+        }
       </Text>
     </View>
   );

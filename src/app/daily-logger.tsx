@@ -9,6 +9,7 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   Modal,
+  Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect } from 'react';
@@ -57,7 +58,74 @@ export default function DailyLoggerScreen() {
 
     const count = parseInt(cigaretteCount, 10);
     
-    // Update daily stats for target date
+    // Check if target is exceeded for gradual mode
+    if (profile.quitMethod === 'gradual' && count > target) {
+      const freezesRemaining = profile.streakFreezes - profile.streakFreezesUsed;
+      
+      if (freezesRemaining > 0) {
+        // Ask user if they want to use freeze
+        Alert.alert(
+          'Hedefi Aştın',
+          `Bugün ${count} sigara içtin, hedefin ${target} idi.\n\nStreak Freeze kullanarak disiplin günü streakini koruyabilirsin.\n\nKalan freeze: ${freezesRemaining}`,
+          [
+            {
+              text: 'Freeze Kullanma',
+              style: 'destructive',
+              onPress: async () => {
+                // Don't use freeze, reset streak
+                await updateDailyStats(targetDate, {
+                  cigarettesSmoked: count,
+                  smokeFree: count === 0,
+                  targetCigarettes: target,
+                  metGoal: false,
+                });
+                router.back();
+              },
+            },
+            {
+              text: 'Freeze Kullan',
+              onPress: async () => {
+                // Use freeze, keep streak
+                const success = useUserStore.getState().useStreakFreeze();
+                if (success) {
+                  await updateDailyStats(targetDate, {
+                    cigarettesSmoked: count,
+                    smokeFree: count === 0,
+                    targetCigarettes: target,
+                    metGoal: true, // Treat as goal met because freeze was used
+                  });
+                }
+                router.back();
+              },
+            },
+          ]
+        );
+        return;
+      } else {
+        // No freeze available, warn and reset streak
+        Alert.alert(
+          'Hedefi Aştın',
+          `Bugün ${count} sigara içtin, hedefin ${target} idi.\n\nFreeze kalmadığı için disiplin günü sıfırlanacak. Takvim verilerin korunur.`,
+          [
+            {
+              text: 'Tamam',
+              onPress: async () => {
+                await updateDailyStats(targetDate, {
+                  cigarettesSmoked: count,
+                  smokeFree: count === 0,
+                  targetCigarettes: target,
+                  metGoal: false,
+                });
+                router.back();
+              },
+            },
+          ]
+        );
+        return;
+      }
+    }
+    
+    // Normal save (goal met or not exceeded)
     await updateDailyStats(targetDate, {
       cigarettesSmoked: count,
       smokeFree: count === 0,

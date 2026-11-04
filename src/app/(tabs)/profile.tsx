@@ -303,6 +303,19 @@ export default function ProfileScreen() {
                 {profile.streakFreezes - profile.streakFreezesUsed} / {profile.streakFreezes} kaldı
               </Text>
             </View>
+            <TouchableOpacity
+              onPress={() => {
+                Alert.alert(
+                  'Streak Freeze',
+                  profile.quitMethod === 'gradual'
+                    ? 'Hedef aşıldığında kullanılır. Disiplin günü streakini korur ve sıfırlanmasını engeller.'
+                    : 'Bir gün sigara içersen, streak freeze kullanarak streakini koruyabilirsin. Freeze kullanmazsan streak sıfırlanır.',
+                  [{ text: 'Tamam' }]
+                );
+              }}
+            >
+              <Ionicons name="information-circle-outline" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
           </View>
         </View>
       </View>

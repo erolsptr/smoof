@@ -73,12 +73,15 @@ export const useStatsStore = create<StatsState>((set, get) => ({
       let smokeFreeStreak = 0;
       
       // Calculate discipline streak (days meeting goal)
+      // For gradual mode: count consecutive days with metGoal: true from today backwards
       for (const stat of sorted) {
-        if (stat.metGoal) {
+        if (stat.metGoal === true) {
           disciplineStreak++;
-        } else {
+        } else if (stat.metGoal === false) {
+          // Explicitly false means they logged but didn't meet goal
           break;
         }
+        // If metGoal is undefined, it's an old entry - don't break, continue counting
       }
       
       // Calculate smoke-free streak (0 cigarettes)
