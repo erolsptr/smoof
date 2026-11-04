@@ -61,6 +61,43 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     
     set({ dailyStats: updatedStats });
     await storage.setItem(STORAGE_KEYS.DAILY_STATS, updatedStats);
+    
+    // Recalculate streaks based on the updated data
+    const calculateStreaks = () => {
+      // Sort stats by date descending
+      const sorted = [...updatedStats].sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+      
+      let disciplineStreak = 0;
+      let smokeFreeStreak = 0;
+      
+      // Calculate discipline streak (days meeting goal)
+      for (const stat of sorted) {
+        if (stat.metGoal) {
+          disciplineStreak++;
+        } else {
+          break;
+        }
+      }
+      
+      // Calculate smoke-free streak (0 cigarettes)
+      for (const stat of sorted) {
+        if (stat.smokeFree && stat.cigarettesSmoked === 0) {
+          smokeFreeStreak++;
+        } else {
+          break;
+        }
+      }
+      
+      set({ 
+        currentStreak: disciplineStreak,
+        smokeFreeStreak: smokeFreeStreak,
+        longestStreak: Math.max(get().longestStreak, disciplineStreak, smokeFreeStreak),
+      });
+    };
+    
+    calculateStreaks();
   },
   
   updateStreakFromQuitDate: (quitDate: string) => {
