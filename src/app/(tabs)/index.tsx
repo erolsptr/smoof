@@ -954,6 +954,35 @@ export default function HomeScreen() {
         </Animated.View>
       </TouchableOpacity>
 
+      {/* Freeze Info Card */}
+      {profile && (
+        <View style={[styles.freezeCard, { 
+          backgroundColor: colors.card,
+          borderColor: colors.cardBorder,
+        }]}>
+          <View style={styles.freezeHeader}>
+            <Ionicons name="snow" size={24} color={colors.accent} />
+            <Text style={[styles.freezeTitle, { color: colors.text }]}>
+              Streak Freeze
+            </Text>
+            <TouchableOpacity 
+              onPress={() => {
+                Alert.alert(
+                  'Streak Freeze Nedir?',
+                  'Bir gün sigara içersen, streak freeze kullanarak streakini koruyabilirsin. Freeze kullanmazsan streak sıfırlanır.',
+                  [{ text: 'Tamam' }]
+                );
+              }}
+            >
+              <Ionicons name="information-circle-outline" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          <Text style={[styles.freezeCount, { color: colors.accent }]}>
+            {profile.streakFreezes - profile.streakFreezesUsed} / {profile.streakFreezes} kaldı
+          </Text>
+        </View>
+      )}
+
       {/* Quick Stats */}
       <View style={styles.quickStats}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
