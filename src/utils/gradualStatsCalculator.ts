@@ -11,15 +11,15 @@ export function calculateGradualCigarettesAvoided(
   if (profile.quitMethod !== 'gradual') return 0;
   
   let totalAvoided = 0;
+  const initialDailyCount = profile.dailyCigaretteCount; // Initial amount (e.g., 20)
   
   for (const stat of dailyStats) {
-    const target = stat.targetCigarettes || getCurrentGradualTarget(profile);
     const actual = stat.cigarettesSmoked || 0;
     
-    // Hedeften ne kadar az içti?
-    // Örnek: Hedef 14, içilen 10 → 4 sigara azalttı
-    // Hedef 14, içilen 18 → 0 (aştı, sayılmaz)
-    const avoided = Math.max(0, target - actual);
+    // Başlangıçtaki miktardan ne kadar az içti?
+    // Örnek: Başlangıç 20, içilen 10 → 10 sigara azalttı
+    // Örnek: Başlangıç 20, içilen 25 → 0 (arttı, sayılmaz)
+    const avoided = Math.max(0, initialDailyCount - actual);
     totalAvoided += avoided;
   }
   
