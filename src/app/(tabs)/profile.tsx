@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } fr
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useUserStore } from '@/store/userStore';
 import { useStatsStore } from '@/store/statsStore';
+import { useAchievementStore } from '@/store/achievementStore';
 import { storage } from '@/utils/storage';
 import { calculateStreakFromQuitDate, getTodayString } from '@/utils/dateHelpers';
 import { Spacing, Typography, BorderRadius } from '@/constants';
@@ -19,6 +20,7 @@ export default function ProfileScreen() {
   const currentStreak = useStatsStore((state) => state.currentStreak);
   const clearStatsData = useStatsStore((state) => state.clearStatsData);
   const updateStreakFromQuitDate = useStatsStore((state) => state.updateStreakFromQuitDate);
+  const resetAchievements = useAchievementStore((state) => state.resetAchievements);
 
   const [testModeVisible, setTestModeVisible] = useState(false);
   const [testTapCount, setTestTapCount] = useState(0);
@@ -76,6 +78,7 @@ export default function ProfileScreen() {
           onPress: async () => {
             await clearUserData();
             await clearStatsData();
+            await resetAchievements();
             await storage.clear();
             router.replace('/onboarding');
           },
@@ -149,6 +152,39 @@ export default function ProfileScreen() {
         </View>
       </LinearGradient>
 
+      {/* Quick Actions */}
+      <View style={styles.quickActions}>
+        <TouchableOpacity
+          style={[styles.actionCard, { backgroundColor: colors.card }]}
+          onPress={() => router.push('/achievements')}
+        >
+          <View style={[styles.actionIconCircle, { backgroundColor: '#F59E0B' + '20' }]}>
+            <Ionicons name="trophy" size={32} color="#F59E0B" />
+          </View>
+          <Text style={[styles.actionTitle, { color: colors.text }]}>
+            Rozetler
+          </Text>
+          <Text style={[styles.actionDesc, { color: colors.textSecondary }]}>
+            Başarılarını gör
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionCard, { backgroundColor: colors.card }]}
+          onPress={() => router.push('/(tabs)/progress')}
+        >
+          <View style={[styles.actionIconCircle, { backgroundColor: colors.primary + '20' }]}>
+            <Ionicons name="trending-up" size={32} color={colors.primary} />
+          </View>
+          <Text style={[styles.actionTitle, { color: colors.text }]}>
+            İlerleme
+          </Text>
+          <Text style={[styles.actionDesc, { color: colors.textSecondary }]}>
+            Grafikler ve stats
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Profile Info */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
@@ -199,7 +235,7 @@ export default function ProfileScreen() {
                 Bırakma Yöntemi
               </Text>
               <Text style={[styles.infoValue, { color: colors.text }]}>
-                {profile.quitMethod === 'cold-turkey' ? 'Tamamen Bırak' : 'Kademeli'}
+                {profile.quitMethod === 'immediate' ? 'Tamamen Bırak' : 'Kademeli'}
               </Text>
             </View>
           </View>
@@ -441,12 +477,47 @@ const styles = StyleSheet.create({
   statsCard: {
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.md,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 6,
+    marginHorizontal: Spacing.lg,
+  },
+  quickActions: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.lg,
+  },
+  actionCard: {
+    flex: 1,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  actionIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.sm,
+  },
+  actionTitle: {
+    fontSize: Typography.sizes.base,
+    fontWeight: Typography.weights.bold,
+    marginBottom: 2,
+  },
+  actionDesc: {
+    fontSize: Typography.sizes.xs,
+    textAlign: 'center',
   },
   statRow: {
     flexDirection: 'row',

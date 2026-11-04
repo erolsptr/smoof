@@ -38,12 +38,19 @@ export default function Step6Screen() {
       packPrice: data.packPrice || 0,
       cigarettesPerPack: 20,
       quitDate: startDate.toISOString(),
-      quitMethod: data.quitMethod === 'gradual' ? 'gradual' : 'cold-turkey',
+      quitMethod: data.quitMethod || 'immediate',
       triggers: [],
       motivations: data.motivations || [],
       streakFreezes: 3,
       streakFreezesUsed: 0,
     };
+
+    // Add gradual-specific fields if method is gradual
+    if (data.quitMethod === 'gradual') {
+      profile.gradualStartDate = startDate.toISOString();
+      profile.gradualStartCount = data.dailyCigarettes || 0;
+      profile.gradualCurrentTarget = data.gradualInitialTarget || Math.floor((data.dailyCigarettes || 0) * 0.7);
+    }
 
     setProfile(profile);
     router.replace('/(tabs)');

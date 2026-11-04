@@ -69,23 +69,23 @@ export default function OnboardingStep4() {
             style={[
               styles.option,
               {
-                backgroundColor: selected === 'cold-turkey' ? colors.primary : colors.card,
-                borderColor: selected === 'cold-turkey' ? colors.primary : colors.cardBorder,
+                backgroundColor: selected === 'immediate' ? colors.primary : colors.card,
+                borderColor: selected === 'immediate' ? colors.primary : colors.cardBorder,
               },
             ]}
-            onPress={() => setSelected('cold-turkey')}
+            onPress={() => setSelected('immediate')}
             activeOpacity={0.8}
           >
             <Text style={styles.optionIcon}>🚀</Text>
             <Text style={[
               styles.optionTitle,
-              { color: selected === 'cold-turkey' ? '#FFFFFF' : colors.text },
+              { color: selected === 'immediate' ? '#FFFFFF' : colors.text },
             ]}>
               Tamamen Bırak
             </Text>
             <Text style={[
               styles.optionDesc,
-              { color: selected === 'cold-turkey' ? 'rgba(255,255,255,0.9)' : colors.textSecondary },
+              { color: selected === 'immediate' ? 'rgba(255,255,255,0.9)' : colors.textSecondary },
             ]}>
               Hemen dur, bir daha içme. En etkili yöntem!
             </Text>

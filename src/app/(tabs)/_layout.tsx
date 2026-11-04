@@ -30,7 +30,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="progress"
         options={{
-          title: 'İlerleme',
+          title: 'İstatistikler',
           tabBarIcon: ({ color }) => (
             <Ionicons name="stats-chart" size={24} color={(color || colors.textTertiary) as string} />
           ),

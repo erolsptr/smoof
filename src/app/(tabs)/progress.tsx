@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useUserStore } from '@/store/userStore';
 import { useStatsStore } from '@/store/statsStore';
@@ -7,10 +8,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
 /**
- * Progress Screen - Shows user's journey and achievements
+ * Progress Screen - Shows statistics, health benefits, and achievements overview
  */
 export default function ProgressScreen() {
   const { colors } = useColorScheme();
+  const router = useRouter();
   const profile = useUserStore((state) => state.profile);
   const currentStreak = useStatsStore((state) => state.currentStreak);
 
@@ -27,82 +29,6 @@ export default function ProgressScreen() {
   const moneySaved = Math.floor((cigarettesNotSmoked / 20) * profile.packPrice);
   const timeSavedHours = Math.floor((cigarettesNotSmoked * 5) / 60);
   const lifeSavedDays = Math.floor((cigarettesNotSmoked * 11) / (60 * 24)); // 11 min per cigarette
-
-  // Milestones
-  const milestones = [
-    { 
-      id: 1, 
-      title: 'İlk 24 Saat', 
-      days: 1, 
-      icon: 'rocket',
-      color: colors.secondary,
-      description: 'Karbonmonoksit seviyesi normale döndü',
-      completed: currentStreak >= 1,
-    },
-    { 
-      id: 2, 
-      title: '3 Gün Güçlü', 
-      days: 3, 
-      icon: 'fitness',
-      color: colors.accent,
-      description: 'Nikotin vücuttan atıldı',
-      completed: currentStreak >= 3,
-    },
-    { 
-      id: 3, 
-      title: 'Bir Haftalık Savaşçı', 
-      days: 7, 
-      icon: 'medal',
-      color: colors.primary,
-      description: 'Tat ve koku alma iyileşti',
-      completed: currentStreak >= 7,
-    },
-    { 
-      id: 4, 
-      title: '2 Hafta Zafer', 
-      days: 14, 
-      icon: 'trophy',
-      color: colors.success,
-      description: 'Dolaşım ve akciğer fonksiyonu arttı',
-      completed: currentStreak >= 14,
-    },
-    { 
-      id: 5, 
-      title: 'Bir Aylık Kahraman', 
-      days: 30, 
-      icon: 'star',
-      color: colors.secondary,
-      description: 'Öksürük ve nefes darlığı azaldı',
-      completed: currentStreak >= 30,
-    },
-    { 
-      id: 6, 
-      title: '3 Aylık Şampiyon', 
-      days: 90, 
-      icon: 'flame',
-      color: colors.error,
-      description: 'Kalp krizi riski %50 azaldı',
-      completed: currentStreak >= 90,
-    },
-    { 
-      id: 7, 
-      title: '6 Aylık Efsane', 
-      days: 180, 
-      icon: 'flash',
-      color: colors.accent,
-      description: 'Akciğer kapasitesi arttı',
-      completed: currentStreak >= 180,
-    },
-    { 
-      id: 8, 
-      title: '1 Yıllık Usta', 
-      days: 365, 
-      icon: 'ribbon',
-      color: '#FFD700',
-      description: 'Kalp hastalığı riski %50 azaldı',
-      completed: currentStreak >= 365,
-    },
-  ];
 
   // Health benefits timeline
   const healthBenefits = [
@@ -122,9 +48,9 @@ export default function ProgressScreen() {
       contentContainerStyle={styles.content}
     >
       {/* Header */}
-      <Text style={[styles.title, { color: colors.text }]}>İlerleme 📊</Text>
+      <Text style={[styles.title, { color: colors.text }]}>İstatistikler 📊</Text>
       <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-        Yolculuğun ve başarıların
+        Yolculuğun ve sağlık faydaların
       </Text>
 
       {/* Stats Summary */}
@@ -162,56 +88,50 @@ export default function ProgressScreen() {
         </View>
       </View>
 
-      {/* Milestones */}
+      {/* Achievements CTA */}
+      <TouchableOpacity
+        style={[styles.achievementsCTA, { 
+          backgroundColor: colors.card,
+          borderColor: colors.primary,
+        }]}
+        onPress={() => router.push('/achievements')}
+        activeOpacity={0.7}
+      >
+        <LinearGradient
+          colors={[colors.primary + '20', colors.accent + '20']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.achievementsCTAGradient}
+        >
+          <View style={styles.achievementsCTAContent}>
+            <View style={[styles.achievementsCTAIcon, { backgroundColor: colors.primary }]}>
+              <Ionicons name="trophy" size={32} color="#FFF" />
+            </View>
+            <View style={styles.achievementsCTAText}>
+              <Text style={[styles.achievementsCTATitle, { color: colors.text }]}>
+                Rozetlerim 🏆
+              </Text>
+              <Text style={[styles.achievementsCTADesc, { color: colors.textSecondary }]}>
+                Başarılarını ve kazandığın rozetleri gör
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color={colors.primary} />
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+
+      {/* TODO: Future Feature - Charts & Graphs */}
+      {/* 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          Başarılar 🏆
+          Grafikler 📈
         </Text>
-        <View style={styles.milestones}>
-          {milestones.map((milestone) => (
-            <View
-              key={milestone.id}
-              style={[
-                styles.milestoneCard,
-                { 
-                  backgroundColor: colors.card,
-                  borderColor: milestone.completed ? milestone.color : colors.cardBorder,
-                  borderWidth: milestone.completed ? 2 : 1,
-                  opacity: milestone.completed ? 1 : 0.6,
-                },
-              ]}
-            >
-              <View style={[
-                styles.milestoneIcon,
-                { backgroundColor: milestone.completed ? milestone.color : colors.cardBorder }
-              ]}>
-                <Ionicons 
-                  name={milestone.icon as any} 
-                  size={28} 
-                  color={milestone.completed ? '#FFF' : colors.textTertiary} 
-                />
-              </View>
-              <View style={styles.milestoneContent}>
-                <Text style={[
-                  styles.milestoneTitle,
-                  { color: milestone.completed ? colors.text : colors.textTertiary }
-                ]}>
-                  {milestone.title}
-                </Text>
-                <Text style={[styles.milestoneDesc, { color: colors.textSecondary }]}>
-                  {milestone.description}
-                </Text>
-                <Text style={[styles.milestoneDays, { color: colors.textTertiary }]}>
-                  {milestone.days} gün
-                </Text>
-              </View>
-              {milestone.completed && (
-                <Ionicons name="checkmark-circle" size={24} color={milestone.color} />
-              )}
-            </View>
-          ))}
-        </View>
+        <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
+          Haftalık ve aylık ilerleme trendlerin
+        </Text>
+        Add charts here: streak trend, money saved trend, crisis count
       </View>
+      */}
 
       {/* Health Benefits */}
       <View style={styles.section}>
@@ -324,37 +244,42 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.sm,
     marginBottom: Spacing.lg,
   },
-  milestones: {
-    gap: Spacing.md,
+  achievementsCTA: {
+    borderRadius: BorderRadius.xl,
+    marginBottom: Spacing.xl,
+    borderWidth: 2,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  milestoneCard: {
+  achievementsCTAGradient: {
+    padding: Spacing.lg,
+  },
+  achievementsCTAContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
     gap: Spacing.md,
   },
-  milestoneIcon: {
+  achievementsCTAIcon: {
     width: 56,
     height: 56,
     borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  milestoneContent: {
+  achievementsCTAText: {
     flex: 1,
   },
-  milestoneTitle: {
-    fontSize: Typography.sizes.base,
+  achievementsCTATitle: {
+    fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
     marginBottom: Spacing.xs,
   },
-  milestoneDesc: {
+  achievementsCTADesc: {
     fontSize: Typography.sizes.sm,
-    marginBottom: Spacing.xs,
-  },
-  milestoneDays: {
-    fontSize: Typography.sizes.xs,
   },
   timeline: {
     gap: 0,

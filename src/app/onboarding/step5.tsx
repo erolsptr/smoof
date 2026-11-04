@@ -1,143 +1,132 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { router } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { useOnboardingStore } from '../../store/onboardingStore';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  TextInput, 
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
+  Image,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { useOnboardingStore } from '@/store/onboardingStore';
+import { Spacing, Typography, BorderRadius } from '@/constants';
 
-const WEEK_OPTIONS = [
-  { weeks: 2, label: '2 Hafta' },
-  { weeks: 4, label: '1 Ay' },
-  { weeks: 8, label: '2 Ay' },
-  { weeks: 12, label: '3 Ay' },
-];
-
-export default function Step5Screen() {
+/**
+ * Onboarding Step 5: Gradual reduction initial target
+ * Only shown if user selected gradual method
+ */
+export default function OnboardingStep5() {
+  const { colors } = useColorScheme();
+  const router = useRouter();
   const { data, setStep5Data } = useOnboardingStore();
-  const [selectedWeeks, setSelectedWeeks] = useState<number | null>(null);
-
+  
+  const [targetCigarettes, setTargetCigarettes] = useState('');
+  
   const dailyCigs = data.dailyCigarettes || 0;
+  const targetNum = parseInt(targetCigarettes, 10);
+  const isValid = targetCigarettes.length > 0 && targetNum > 0 && targetNum < dailyCigs;
 
   const handleContinue = () => {
-    if (selectedWeeks) {
-      setStep5Data(selectedWeeks);
+    if (isValid) {
+      setStep5Data(targetNum);
       router.push('/onboarding/step6');
     }
   };
 
-  const renderPlan = (weeks: number) => {
-    const weeksPerPhase = Math.floor(weeks / 4);
-    const cigsPerPhase = Math.ceil(dailyCigs / 4);
-
-    return (
-      <View style={styles.planContainer}>
-        <View style={styles.planRow}>
-          <View style={styles.phaseIndicator}>
-            <Text style={styles.phaseNumber}>1</Text>
-          </View>
-          <View style={styles.phaseContent}>
-            <Text style={styles.phaseTitle}>İlk {weeksPerPhase} hafta</Text>
-            <Text style={styles.phaseDetail}>{cigsPerPhase * 3} sigara/gün</Text>
-          </View>
-        </View>
-
-        <View style={styles.planRow}>
-          <View style={styles.phaseIndicator}>
-            <Text style={styles.phaseNumber}>2</Text>
-          </View>
-          <View style={styles.phaseContent}>
-            <Text style={styles.phaseTitle}>Sonraki {weeksPerPhase} hafta</Text>
-            <Text style={styles.phaseDetail}>{cigsPerPhase * 2} sigara/gün</Text>
-          </View>
-        </View>
-
-        <View style={styles.planRow}>
-          <View style={styles.phaseIndicator}>
-            <Text style={styles.phaseNumber}>3</Text>
-          </View>
-          <View style={styles.phaseContent}>
-            <Text style={styles.phaseTitle}>Sonraki {weeksPerPhase} hafta</Text>
-            <Text style={styles.phaseDetail}>{cigsPerPhase} sigara/gün</Text>
-          </View>
-        </View>
-
-        <View style={styles.planRow}>
-          <View style={[styles.phaseIndicator, styles.finalPhaseIndicator]}>
-            <Ionicons name="checkmark" size={20} color="#fff" />
-          </View>
-          <View style={styles.phaseContent}>
-            <Text style={styles.phaseTitle}>Son {weeksPerPhase} hafta</Text>
-            <Text style={styles.phaseDetail}>0 sigara/gün 🎉</Text>
-          </View>
-        </View>
-      </View>
-    );
-  };
-
   return (
-    <LinearGradient colors={['#4ECDC4', '#44A08D']} style={styles.container}>
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#fff" />
-          </TouchableOpacity>
-        </View>
-
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.content}>
-          <View style={styles.iconContainer}>
-            <Ionicons name="trending-down" size={48} color="#fff" />
+          {/* Progress */}
+          <View style={styles.progress}>
+            <View style={[styles.progressDot, { backgroundColor: colors.primary }]} />
+            <View style={[styles.progressDot, { backgroundColor: colors.primary }]} />
+            <View style={[styles.progressDot, { backgroundColor: colors.primary }]} />
+            <View style={[styles.progressDot, { backgroundColor: colors.primary }]} />
+            <View style={[styles.progressDot, { backgroundColor: colors.primary }]} />
           </View>
 
-          <Text style={styles.title}>Planını Seç</Text>
-          <Text style={styles.subtitle}>
-            Günde {dailyCigs} sigara içiyorsun. Kaç haftada sıfıra inmek istersin?
+          {/* Mascot */}
+          <Image 
+            source={require('../../../assets/smoof.png')}
+            style={styles.mascot}
+            resizeMode="contain"
+          />
+          
+          {/* Question */}
+          <Text style={[styles.question, { color: colors.text }]}>
+            İlk hedef kaç sigara? 📉
+          </Text>
+          
+          <Text style={[styles.hint, { color: colors.textSecondary }]}>
+            Şu an günde {dailyCigs} sigara içiyorsun
           </Text>
 
-          <View style={styles.optionsContainer}>
-            {WEEK_OPTIONS.map((option) => (
-              <TouchableOpacity
-                key={option.weeks}
-                style={[
-                  styles.optionCard,
-                  selectedWeeks === option.weeks && styles.optionCardSelected,
-                ]}
-                onPress={() => setSelectedWeeks(option.weeks)}
-              >
-                <View style={styles.optionHeader}>
-                  <Text style={styles.optionLabel}>{option.label}</Text>
-                  {selectedWeeks === option.weeks && (
-                    <Ionicons name="checkmark-circle" size={24} color="#4ECDC4" />
-                  )}
-                </View>
-                
-                {selectedWeeks === option.weeks && renderPlan(option.weeks)}
-              </TouchableOpacity>
-            ))}
+          {/* Input */}
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={[
+                styles.input,
+                { 
+                  backgroundColor: colors.card,
+                  color: colors.text,
+                  borderColor: isValid ? colors.primary : colors.cardBorder,
+                }
+              ]}
+              value={targetCigarettes}
+              onChangeText={setTargetCigarettes}
+              placeholder={Math.floor(dailyCigs * 0.7).toString()}
+              placeholderTextColor={colors.textTertiary}
+              keyboardType="number-pad"
+              autoFocus
+              maxLength={3}
+            />
+            <Text style={[styles.unit, { color: colors.textSecondary }]}>
+              sigara/gün
+            </Text>
           </View>
 
+          {/* Validation message */}
+          {targetCigarettes.length > 0 && !isValid && (
+            <Text style={[styles.errorText, { color: colors.error }]}>
+              {targetNum >= dailyCigs 
+                ? `Hedef ${dailyCigs}'den az olmalı` 
+                : 'Geçerli bir sayı gir'}
+            </Text>
+          )}
+
+          {/* Tip */}
+          <View style={[styles.tipBox, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+            <Text style={[styles.tipText, { color: colors.textSecondary }]}>
+              💡 İlk hedef günlük sigaranın %20-30'unu azaltmak olabilir
+            </Text>
+          </View>
+
+          {/* Continue Button */}
           <TouchableOpacity
-            style={[styles.continueButton, !selectedWeeks && styles.continueButtonDisabled]}
+            style={[
+              styles.button, 
+              { backgroundColor: isValid ? colors.primary : colors.cardBorder }
+            ]}
             onPress={handleContinue}
-            disabled={!selectedWeeks}
+            disabled={!isValid}
+            activeOpacity={0.8}
           >
-            <Text style={styles.continueButtonText}>Devam Et</Text>
-            <Ionicons name="arrow-forward" size={20} color="#4ECDC4" />
+            <Text style={[styles.buttonText, { opacity: isValid ? 1 : 0.5 }]}>
+              Devam Et
+            </Text>
           </TouchableOpacity>
-
-          <View style={styles.progressDots}>
-            {[0, 1, 2, 3, 4].map((i) => (
-              <View
-                key={i}
-                style={[styles.dot, i === 4 && styles.dotActive]}
-              />
-            ))}
-          </View>
         </View>
-      </ScrollView>
-    </LinearGradient>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -145,151 +134,89 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContent: {
-    flexGrow: 1,
-  },
-  header: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   content: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 20,
-  },
-  iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 12,
-  },
-  subtitle: {
-    fontSize: 17,
-    color: 'rgba(255,255,255,0.9)',
-    marginBottom: 32,
-    lineHeight: 24,
-  },
-  optionsContainer: {
-    gap: 12,
-    marginBottom: 32,
-  },
-  optionCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  optionCardSelected: {
-    borderColor: '#4ECDC4',
-    backgroundColor: '#f0fffe',
-  },
-  optionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  optionLabel: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#2D3748',
-  },
-  planContainer: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    gap: 12,
-  },
-  planRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  phaseIndicator: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#4ECDC4',
+    padding: Spacing.lg,
+    paddingTop: Spacing['4xl'],
     alignItems: 'center',
     justifyContent: 'center',
   },
-  finalPhaseIndicator: {
-    backgroundColor: '#48BB78',
-  },
-  phaseNumber: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  phaseContent: {
-    flex: 1,
-  },
-  phaseTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2D3748',
-    marginBottom: 2,
-  },
-  phaseDetail: {
-    fontSize: 13,
-    color: '#718096',
-  },
-  continueButton: {
+  progress: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
-    marginBottom: 24,
+    gap: Spacing.sm,
+    marginBottom: Spacing['2xl'],
+    position: 'absolute',
+    top: Spacing['2xl'],
   },
-  continueButtonDisabled: {
-    opacity: 0.5,
-  },
-  continueButtonText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#4ECDC4',
-  },
-  progressDots: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    paddingBottom: 40,
-  },
-  dot: {
+  progressDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.3)',
   },
-  dotActive: {
-    backgroundColor: '#fff',
-    width: 24,
+  mascot: {
+    width: 80,
+    height: 80,
+    marginBottom: Spacing.xl,
+  },
+  question: {
+    fontSize: Typography.sizes['3xl'],
+    fontWeight: Typography.weights.bold,
+    textAlign: 'center',
+    marginBottom: Spacing.md,
+  },
+  hint: {
+    fontSize: Typography.sizes.base,
+    textAlign: 'center',
+    marginBottom: Spacing['2xl'],
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  input: {
+    fontSize: Typography.sizes['4xl'],
+    fontWeight: Typography.weights.bold,
+    textAlign: 'center',
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 2,
+    minWidth: 120,
+  },
+  unit: {
+    fontSize: Typography.sizes.base,
+  },
+  errorText: {
+    fontSize: Typography.sizes.sm,
+    marginBottom: Spacing.md,
+  },
+  tipBox: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.xl,
+    maxWidth: '90%',
+  },
+  tipText: {
+    fontSize: Typography.sizes.sm,
+    textAlign: 'center',
+    lineHeight: Typography.sizes.sm * 1.5,
+  },
+  button: {
+    width: '100%',
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    position: 'absolute',
+    bottom: Spacing.xl,
+    left: Spacing.lg,
+    right: Spacing.lg,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: Typography.sizes.lg,
+    fontWeight: Typography.weights.bold,
   },
 });

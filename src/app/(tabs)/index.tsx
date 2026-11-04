@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useUserStore } from '@/store/userStore';
 import { useStatsStore } from '@/store/statsStore';
+import { useAchievementStore } from '@/store/achievementStore';
 import { calculateStreakFromQuitDate } from '@/utils/dateHelpers';
 import { Spacing, Typography, BorderRadius } from '@/constants';
 import { useState, useEffect, useRef } from 'react';
@@ -18,6 +19,8 @@ export default function HomeScreen() {
   const router = useRouter();
   const profile = useUserStore((state) => state.profile);
   const currentStreak = useStatsStore((state) => state.currentStreak);
+  const crisisLogs = useStatsStore((state) => state.crisisLogs);
+  const { checkAndUnlockAchievements, checkTimedHealthAchievements, loadAchievements } = useAchievementStore();
   
   const [activeCard, setActiveCard] = useState(0);
   
@@ -112,6 +115,28 @@ export default function HomeScreen() {
       }
     }
   }, [profile?.quitDate, currentStreak]);
+
+  // Check and unlock achievements
+  useEffect(() => {
+    const checkAchievements = async () => {
+      if (profile && currentStreak >= 0) {
+        const cigarettesNotSmoked = currentStreak * profile.dailyCigaretteCount;
+        const moneySaved = Math.floor((cigarettesNotSmoked / profile.cigarettesPerPack) * profile.packPrice);
+        const crisesHandled = crisisLogs.length; // Use actual crisis count
+        const hasSlipped = false; // TODO: Get from stats
+        
+        await loadAchievements();
+        await checkAndUnlockAchievements(currentStreak, moneySaved, crisesHandled, hasSlipped);
+        
+        // Check time-based health achievements (20min, 12hours)
+        if (profile.quitDate) {
+          await checkTimedHealthAchievements(profile.quitDate);
+        }
+      }
+    };
+    
+    checkAchievements();
+  }, [currentStreak, profile, crisisLogs.length]);
 
   // Calculate real stats
   const cigarettesNotSmoked = profile 
@@ -394,10 +419,14 @@ export default function HomeScreen() {
           </View>
           <Text style={styles.streakLabel}>İLK GÜNÜN</Text>
           <Text style={styles.firstDayMessage}>
-            Bugün Sigara İçmeden Tamamla
+            {profile?.quitMethod === 'gradual' 
+              ? `Hedefin: ${profile.gradualCurrentTarget} sigara` 
+              : 'Bugün Sigara İçmeden Tamamla'}
           </Text>
           <Text style={styles.firstDaySubMessage}>
-            Streak'ini 1 yapacağız! 💪
+            {profile?.quitMethod === 'gradual' 
+              ? 'Hedefe uygun başla! 💪' 
+              : "Streak'ini 1 yapacağız! 💪"}
           </Text>
         </LinearGradient>
 
@@ -462,6 +491,222 @@ export default function HomeScreen() {
     );
   }
 
+  // GRADUAL MODE - Different UI for gradual reduction users
+  if (profile?.quitMethod === 'gradual') {
+    const today = new Date().toISOString().split('T')[0];
+    const todayStats = useStatsStore.getState().dailyStats.find(s => s.date === today);
+    const todayCigarettes = todayStats?.cigarettesSmoked || 0;
+    const target = profile.gradualCurrentTarget || 0;
+    const smokeFreeStreak = useStatsStore.getState().smokeFreeStreak;
+    const startCount = profile.gradualStartCount || profile.dailyCigaretteCount;
+    const reductionPercent = startCount > 0 
+      ? Math.floor(((startCount - target) / startCount) * 100)
+      : 0;
+
+    return (
+      <ScrollView 
+        style={[styles.container, { backgroundColor: colors.background }]}
+        contentContainerStyle={styles.content}
+      >
+        {/* Mascot & Greeting */}
+        <View style={styles.header}>
+          <Animated.View 
+            style={[
+              styles.avatarPlaceholder,
+              { 
+                backgroundColor: 'transparent',
+                transform: [{ scale: mascotScale }] 
+              }
+            ]}
+          >
+            <Image 
+              source={require('../../../assets/smoof.png')}
+              style={styles.smoofImage}
+              resizeMode="contain"
+            />
+          </Animated.View>
+          <Text style={[styles.greeting, { color: colors.text }]}>
+            Merhaba! Bugün nasılsın?
+          </Text>
+          <Text style={[styles.subGreeting, { color: colors.textSecondary }]}>
+            {currentStreak > 0 ? `${currentStreak} gün disiplinli! 💪` : 'Başlamaya hazır mısın? 🚀'}
+          </Text>
+        </View>
+
+        {/* Discipline Streak Card */}
+        <Animated.View 
+          style={[
+            { 
+              opacity: streakOpacity,
+              transform: [{ scale: streakScale }]
+            }
+          ]}
+        >
+          <LinearGradient
+            colors={[colors.primary, colors.primaryDark]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.streakCard}
+          >
+            <View style={styles.streakIconContainer}>
+              <Ionicons name="fitness" size={32} color="#FFF" />
+            </View>
+            <Text style={styles.streakLabel}>Disiplin Günü</Text>
+            <View style={styles.streakRow}>
+              <Text style={styles.streakNumber}>{currentStreak}</Text>
+              <Text style={styles.streakDays}>GÜN</Text>
+            </View>
+          </LinearGradient>
+        </Animated.View>
+
+        {/* Today's Goal Card */}
+        <View style={[styles.goalCard, { 
+          backgroundColor: colors.card,
+          borderColor: colors.cardBorder,
+        }]}>
+          <View style={styles.goalHeader}>
+            <Text style={[styles.goalTitle, { color: colors.text }]}>
+              Bugün Hedef
+            </Text>
+            <TouchableOpacity
+              style={[styles.updateButton, { backgroundColor: colors.primary }]}
+              onPress={() => router.push('/daily-logger')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.updateButtonText}>Güncelle</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.goalContent}>
+            <View style={styles.goalStat}>
+              <Text style={[styles.goalLabel, { color: colors.textSecondary }]}>
+                Hedef
+              </Text>
+              <Text style={[styles.goalValue, { color: colors.text }]}>
+                {target} sigara
+              </Text>
+            </View>
+            
+            <View style={styles.goalDivider} />
+            
+            <View style={styles.goalStat}>
+              <Text style={[styles.goalLabel, { color: colors.textSecondary }]}>
+                İçtiğin
+              </Text>
+              <View style={styles.goalValueRow}>
+                <Text style={[styles.goalValue, { 
+                  color: todayCigarettes <= target ? colors.success : colors.error 
+                }]}>
+                  {todayCigarettes}
+                </Text>
+                <Ionicons 
+                  name={todayCigarettes <= target ? 'checkmark-circle' : 'alert-circle'} 
+                  size={24} 
+                  color={todayCigarettes <= target ? colors.success : colors.error} 
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Progress bar */}
+          <View style={[styles.progressBarContainer, { backgroundColor: colors.cardBorder }]}>
+            <View 
+              style={[
+                styles.progressBarFill, 
+                { 
+                  backgroundColor: target > 0 
+                    ? (todayCigarettes / target > 1 ? colors.error : colors.primary)
+                    : colors.success,
+                  width: target > 0 
+                    ? `${Math.min((todayCigarettes / target) * 100, 100)}%`
+                    : '100%',
+                }
+              ]} 
+            />
+          </View>
+        </View>
+
+        {/* Smoke-Free Streak (if any) */}
+        {smokeFreeStreak > 0 && (
+          <View style={[styles.smokeFreeCard, { 
+            backgroundColor: colors.success + '20',
+            borderColor: colors.success,
+          }]}>
+            <Ionicons name="star" size={32} color={colors.success} />
+            <View style={styles.smokeFreeContent}>
+              <Text style={[styles.smokeFreeLabel, { color: colors.success }]}>
+                Sigarasız Gün
+              </Text>
+              <Text style={[styles.smokeFreeValue, { color: colors.success }]}>
+                {smokeFreeStreak} GÜN
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Reduction Progress */}
+        <View style={[styles.reductionCard, { 
+          backgroundColor: colors.card,
+          borderColor: colors.cardBorder,
+        }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            Azaltma İlerlemeniz
+          </Text>
+          
+          <View style={styles.reductionStats}>
+            <View style={styles.reductionStat}>
+              <Text style={[styles.reductionLabel, { color: colors.textSecondary }]}>
+                Başlangıç
+              </Text>
+              <Text style={[styles.reductionValue, { color: colors.text }]}>
+                {startCount}
+              </Text>
+            </View>
+            
+            <Ionicons name="arrow-forward" size={24} color={colors.textSecondary} />
+            
+            <View style={styles.reductionStat}>
+              <Text style={[styles.reductionLabel, { color: colors.textSecondary }]}>
+                Şimdi
+              </Text>
+              <Text style={[styles.reductionValue, { color: colors.primary }]}>
+                {target}
+              </Text>
+            </View>
+            
+            <Ionicons name="arrow-forward" size={24} color={colors.textSecondary} />
+            
+            <View style={styles.reductionStat}>
+              <Text style={[styles.reductionLabel, { color: colors.textSecondary }]}>
+                Hedef
+              </Text>
+              <Text style={[styles.reductionValue, { color: colors.success }]}>
+                0
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.reductionPercentBox}>
+            <Text style={[styles.reductionPercent, { color: colors.primary }]}>
+              %{reductionPercent} azalttın! 🎯
+            </Text>
+          </View>
+        </View>
+
+        {/* Crisis Button */}
+        <TouchableOpacity
+          style={[styles.crisisButton, { backgroundColor: colors.error }]}
+          activeOpacity={0.8}
+          onPress={() => router.push('/crisis')}
+        >
+          <Ionicons name="alert-circle" size={24} color="#FFFFFF" />
+          <Text style={styles.crisisText}>Sigara İçmek İstiyorum</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    );
+  }
+
+  // IMMEDIATE MODE - Original UI for immediate quit users
   return (
     <ScrollView 
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -925,5 +1170,131 @@ const styles = StyleSheet.create({
   },
   benefitDesc: {
     fontSize: Typography.sizes.sm,
+  },
+  // Gradual mode styles
+  goalCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  goalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  goalTitle: {
+    fontSize: Typography.sizes.lg,
+    fontWeight: Typography.weights.bold,
+  },
+  updateButton: {
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+  },
+  updateButtonText: {
+    color: '#FFFFFF',
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
+  },
+  goalContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: Spacing.md,
+  },
+  goalStat: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  goalLabel: {
+    fontSize: Typography.sizes.sm,
+    marginBottom: Spacing.xs,
+  },
+  goalValue: {
+    fontSize: Typography.sizes['2xl'],
+    fontWeight: Typography.weights.bold,
+  },
+  goalValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  goalDivider: {
+    width: 1,
+    backgroundColor: '#E5E7EB',
+  },
+  progressBarContainer: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  smokeFreeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 2,
+    marginBottom: Spacing.lg,
+    gap: Spacing.md,
+  },
+  smokeFreeContent: {
+    flex: 1,
+  },
+  smokeFreeLabel: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.medium,
+    marginBottom: 2,
+  },
+  smokeFreeValue: {
+    fontSize: Typography.sizes.xl,
+    fontWeight: Typography.weights.bold,
+  },
+  reductionCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+    gap: Spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  reductionStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  reductionStat: {
+    alignItems: 'center',
+  },
+  reductionLabel: {
+    fontSize: Typography.sizes.xs,
+    marginBottom: Spacing.xs,
+  },
+  reductionValue: {
+    fontSize: Typography.sizes.xl,
+    fontWeight: Typography.weights.bold,
+  },
+  reductionPercentBox: {
+    alignItems: 'center',
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  reductionPercent: {
+    fontSize: Typography.sizes.lg,
+    fontWeight: Typography.weights.bold,
   },
 });

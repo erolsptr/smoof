@@ -20,8 +20,8 @@ interface OnboardingData {
   // Step 4: Quit method
   quitMethod: QuitMethod;
   
-  // Step 5: Gradual plan (if kademeli)
-  gradualWeeks?: number;
+  // Step 5: Gradual initial target (if kademeli)
+  gradualInitialTarget?: number;
   
   // Step 6: Start date
   startDate: string;
@@ -33,7 +33,7 @@ interface OnboardingState {
   setStep2Data: (dailyCigarettes: number, packPrice: number, smokingYears?: number) => void;
   setStep3Data: (motivations: string[]) => void;
   setStep4Data: (quitMethod: QuitMethod) => void;
-  setStep5Data: (gradualWeeks: number) => void;
+  setStep5Data: (gradualInitialTarget: number) => void;
   setStep6Data: (startDate: string) => void;
   getCompleteData: () => OnboardingData | null;
   clearData: () => void;
@@ -66,9 +66,9 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
     }));
   },
   
-  setStep5Data: (gradualWeeks) => {
+  setStep5Data: (gradualInitialTarget) => {
     set((state) => ({
-      data: { ...state.data, gradualWeeks },
+      data: { ...state.data, gradualInitialTarget },
     }));
   },
   

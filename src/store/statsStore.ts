@@ -6,7 +6,8 @@ import type { DailyStats, CrisisLog } from '@/types';
 interface StatsState {
   dailyStats: DailyStats[];
   crisisLogs: CrisisLog[];
-  currentStreak: number;
+  currentStreak: number; // For immediate: smoke-free days, For gradual: discipline days
+  smokeFreeStreak: number; // Only counts days with 0 cigarettes (for gradual method)
   longestStreak: number;
   
   // Actions
@@ -22,6 +23,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   dailyStats: [],
   crisisLogs: [],
   currentStreak: 0,
+  smokeFreeStreak: 0,
   longestStreak: 0,
   
   logCrisis: async (log) => {
@@ -102,6 +104,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
       dailyStats: [],
       crisisLogs: [],
       currentStreak: 0,
+      smokeFreeStreak: 0,
       longestStreak: 0,
     });
   },
