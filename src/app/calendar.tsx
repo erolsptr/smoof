@@ -56,8 +56,20 @@ export default function CalendarScreen() {
     setCurrentMonth(newDate);
   };
 
-  const getDayStatus = (day: number): { status: 'perfect' | 'good' | 'over' | 'future' | 'empty', count: number, target: number } => {
+  const getDayStatus = (day: number): { status: 'perfect' | 'good' | 'over' | 'future' | 'empty' | 'locked', count: number, target: number } => {
     const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    
+    // Check if date is before quit date
+    const quitDate = new Date(profile.quitDate);
+    quitDate.setHours(0, 0, 0, 0);
+    
+    const currentDate = new Date(year, month, day);
+    currentDate.setHours(0, 0, 0, 0);
+    
+    // Locked dates (before quit date)
+    if (currentDate < quitDate) {
+      return { status: 'locked', count: 0, target: getCurrentGradualTarget(profile) };
+    }
     
     // Create today in same format (local date)
     const todayDate = new Date();
@@ -93,6 +105,18 @@ export default function CalendarScreen() {
 
   const handleDayPress = (day: number) => {
     const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    
+    // Check if date is locked (before quit date)
+    const quitDate = new Date(profile.quitDate);
+    quitDate.setHours(0, 0, 0, 0);
+    
+    const currentDate = new Date(year, month, day);
+    currentDate.setHours(0, 0, 0, 0);
+    
+    // Don't allow editing locked dates
+    if (currentDate < quitDate) {
+      return;
+    }
     
     // Create today in same format (local date)
     const todayDate = new Date();
@@ -185,6 +209,7 @@ export default function CalendarScreen() {
             const { status, count, target } = getDayStatus(day);
             const isFuture = status === 'future';
             const isEmpty = status === 'empty';
+            const isLocked = status === 'locked';
             
             return (
               <TouchableOpacity
@@ -205,21 +230,28 @@ export default function CalendarScreen() {
                     backgroundColor: colors.error + '20',
                     borderColor: colors.error,
                   },
+                  status === 'locked' && {
+                    backgroundColor: colors.cardBorder + '40',
+                    borderColor: colors.cardBorder,
+                  },
                 ]}
                 onPress={() => handleDayPress(day)}
-                disabled={isFuture}
-                activeOpacity={isFuture ? 1 : 0.7}
+                disabled={isFuture || isLocked}
+                activeOpacity={isFuture || isLocked ? 1 : 0.7}
               >
                 <Text style={[
                   styles.dayNumber,
-                  { color: isFuture ? colors.textTertiary : colors.text },
+                  { color: isFuture || isLocked ? colors.textTertiary : colors.text },
                   status === 'perfect' && { color: colors.success },
                   status === 'good' && { color: colors.info },
                   status === 'over' && { color: colors.error },
                 ]}>
                   {day}
                 </Text>
-                {!isFuture && !isEmpty && (
+                {isLocked && (
+                  <Ionicons name="lock-closed" size={12} color={colors.textTertiary} />
+                )}
+                {!isFuture && !isEmpty && !isLocked && (
                   <Text style={[styles.dayCount, { color: colors.textSecondary }]}>
                     {count}/{target}
                   </Text>
@@ -344,6 +376,10 @@ const styles = StyleSheet.create({
   },
   dayCell_empty: {
     backgroundColor: 'transparent',
+  },
+  dayCell_locked: {
+    backgroundColor: 'transparent',
+    opacity: 0.5,
   },
   dayNumber: {
     fontSize: Typography.sizes.sm,

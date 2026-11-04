@@ -46,6 +46,15 @@ export default function DailyLoggerScreen() {
   const countNum = parseInt(cigaretteCount, 10) || 0;
   const isValid = cigaretteCount.length > 0 && countNum >= 0 && countNum <= 50;
 
+  // Check if target date is before quit date
+  const quitDate = new Date(profile?.quitDate || '');
+  quitDate.setHours(0, 0, 0, 0);
+  
+  const targetDateObj = new Date(targetDate);
+  targetDateObj.setHours(0, 0, 0, 0);
+  
+  const isBeforeQuitDate = targetDateObj < quitDate;
+
   // Load target date's data if exists
   useEffect(() => {
     const targetStats = dailyStats.find(s => s.date === targetDate);
@@ -54,6 +63,29 @@ export default function DailyLoggerScreen() {
       setPreviousDayCount(targetStats.cigarettesSmoked);
     }
   }, [dailyStats, targetDate]);
+
+  // Show locked screen if date is before quit date
+  if (isBeforeQuitDate && profile) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.lockedScreen}>
+          <Ionicons name="lock-closed" size={64} color={colors.textTertiary} />
+          <Text style={[styles.lockedTitle, { color: colors.text }]}>
+            Bu Gün Kilitli
+          </Text>
+          <Text style={[styles.lockedMessage, { color: colors.textSecondary }]}>
+            {formatDateShort(profile.quitDate)} tarihinden önce sigara girişi yapamazsın.
+          </Text>
+          <TouchableOpacity 
+            style={[styles.backButton, { backgroundColor: colors.primary }]}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backButtonText}>Geri Dön</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   const handleSave = async () => {
     if (!isValid || !profile) return;
@@ -376,5 +408,34 @@ const styles = StyleSheet.create({
   celebrationText: {
     fontSize: Typography.sizes.lg,
     textAlign: 'center',
+  },
+  lockedScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.xl,
+  },
+  lockedTitle: {
+    fontSize: Typography.sizes['2xl'],
+    fontWeight: Typography.weights.bold,
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.md,
+    textAlign: 'center',
+  },
+  lockedMessage: {
+    fontSize: Typography.sizes.base,
+    textAlign: 'center',
+    marginBottom: Spacing['2xl'],
+    paddingHorizontal: Spacing.lg,
+  },
+  backButton: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing['2xl'],
+    borderRadius: BorderRadius.md,
+  },
+  backButtonText: {
+    color: '#FFFFFF',
+    fontSize: Typography.sizes.base,
+    fontWeight: Typography.weights.bold,
   },
 });
