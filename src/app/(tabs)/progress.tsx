@@ -6,6 +6,7 @@ import { useStatsStore } from '@/store/statsStore';
 import { Spacing, Typography, BorderRadius } from '@/constants';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { calculateGradualCigarettesAvoided, calculateGradualMoneySaved } from '@/utils/gradualStatsCalculator';
 
 /**
  * Progress Screen - Shows statistics, health benefits, and achievements overview
@@ -15,6 +16,7 @@ export default function ProgressScreen() {
   const router = useRouter();
   const profile = useUserStore((state) => state.profile);
   const currentStreak = useStatsStore((state) => state.currentStreak);
+  const dailyStats = useStatsStore((state) => state.dailyStats);
 
   if (!profile) {
     return (
@@ -25,8 +27,14 @@ export default function ProgressScreen() {
   }
 
   // Calculate stats
-  const cigarettesNotSmoked = currentStreak * profile.dailyCigaretteCount;
-  const moneySaved = Math.floor((cigarettesNotSmoked / 20) * profile.packPrice);
+  const cigarettesNotSmoked = profile?.quitMethod === 'gradual'
+    ? calculateGradualCigarettesAvoided(profile, dailyStats)
+    : currentStreak * profile.dailyCigaretteCount;
+
+  const moneySaved = profile?.quitMethod === 'gradual'
+    ? calculateGradualMoneySaved(profile, cigarettesNotSmoked)
+    : Math.floor((cigarettesNotSmoked / profile.cigarettesPerPack) * profile.packPrice);
+
   const timeSavedHours = Math.floor((cigarettesNotSmoked * 5) / 60);
   const lifeSavedDays = Math.floor((cigarettesNotSmoked * 11) / (60 * 24)); // 11 min per cigarette
 

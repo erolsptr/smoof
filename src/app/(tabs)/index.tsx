@@ -6,6 +6,7 @@ import { useStatsStore } from '@/store/statsStore';
 import { useAchievementStore } from '@/store/achievementStore';
 import { calculateStreakFromQuitDate } from '@/utils/dateHelpers';
 import { getCurrentGradualTarget, getNextWeekTarget, getLastNDays, getDayName } from '@/utils/gradualHelpers';
+import { calculateGradualCigarettesAvoided, calculateGradualMoneySaved } from '@/utils/gradualStatsCalculator';
 import { Spacing, Typography, BorderRadius } from '@/constants';
 import { useState, useEffect, useRef } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,6 +22,7 @@ export default function HomeScreen() {
   const profile = useUserStore((state) => state.profile);
   const currentStreak = useStatsStore((state) => state.currentStreak);
   const crisisLogs = useStatsStore((state) => state.crisisLogs);
+  const dailyStats = useStatsStore((state) => state.dailyStats);
   const { checkAndUnlockAchievements, checkTimedHealthAchievements, loadAchievements } = useAchievementStore();
   
   const [activeCard, setActiveCard] = useState(0);
@@ -121,8 +123,12 @@ export default function HomeScreen() {
   useEffect(() => {
     const checkAchievements = async () => {
       if (profile && currentStreak >= 0) {
-        const cigarettesNotSmoked = currentStreak * profile.dailyCigaretteCount;
-        const moneySaved = Math.floor((cigarettesNotSmoked / profile.cigarettesPerPack) * profile.packPrice);
+        const cigarettesNotSmoked = profile.quitMethod === 'gradual'
+          ? calculateGradualCigarettesAvoided(profile, dailyStats)
+          : currentStreak * profile.dailyCigaretteCount;
+        const moneySaved = profile.quitMethod === 'gradual'
+          ? calculateGradualMoneySaved(profile, cigarettesNotSmoked)
+          : Math.floor((cigarettesNotSmoked / profile.cigarettesPerPack) * profile.packPrice);
         const crisesHandled = crisisLogs.length; // Use actual crisis count
         const hasSlipped = false; // TODO: Get from stats
         
@@ -137,15 +143,19 @@ export default function HomeScreen() {
     };
     
     checkAchievements();
-  }, [currentStreak, profile, crisisLogs.length]);
+  }, [currentStreak, profile, crisisLogs.length, dailyStats.length]);
 
   // Calculate real stats
   const cigarettesNotSmoked = profile 
-    ? currentStreak * profile.dailyCigaretteCount 
+    ? (profile.quitMethod === 'gradual'
+        ? calculateGradualCigarettesAvoided(profile, dailyStats)
+        : currentStreak * profile.dailyCigaretteCount)
     : 0;
     
   const moneySaved = profile
-    ? (cigarettesNotSmoked / profile.cigarettesPerPack) * profile.packPrice
+    ? (profile.quitMethod === 'gradual'
+        ? calculateGradualMoneySaved(profile, cigarettesNotSmoked)
+        : (cigarettesNotSmoked / profile.cigarettesPerPack) * profile.packPrice)
     : 0;
     
   const timeSavedMinutes = cigarettesNotSmoked * 5; // 5 min per cigarette
