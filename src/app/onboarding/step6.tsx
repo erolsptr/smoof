@@ -50,6 +50,8 @@ export default function Step6Screen() {
       profile.gradualStartDate = startDate.toISOString();
       profile.gradualStartCount = data.dailyCigarettes || 0;
       profile.gradualCurrentTarget = data.gradualInitialTarget || Math.floor((data.dailyCigarettes || 0) * 0.7);
+      profile.gradualTargetWeeks = data.gradualTargetWeeks || 6;
+      profile.gradualWeeklyReduction = data.gradualWeeklyReduction || Math.ceil((data.dailyCigarettes || 0) / 6);
     }
 
     setProfile(profile);

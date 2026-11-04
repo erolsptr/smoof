@@ -21,6 +21,8 @@ export interface UserProfile {
   gradualStartDate?: string; // When gradual reduction started
   gradualStartCount?: number; // Starting cigarettes/day (e.g., 20)
   gradualCurrentTarget?: number; // Current daily target (e.g., 8)
+  gradualTargetWeeks?: number; // Target duration in weeks (4, 6, 8, 12)
+  gradualWeeklyReduction?: number; // Weekly reduction amount
   
   // Personalization
   triggers: string[]; // e.g., ['coffee', 'stress', 'social']

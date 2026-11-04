@@ -10,49 +10,55 @@ import {
   Keyboard,
   Modal,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useUserStore } from '@/store/userStore';
 import { useStatsStore } from '@/store/statsStore';
 import { Spacing, Typography, BorderRadius } from '@/constants';
 import { Ionicons } from '@expo/vector-icons';
+import { formatDateShort } from '@/utils/gradualHelpers';
 
 /**
  * Daily Logger Screen - For gradual reduction users
- * Log how many cigarettes smoked today
+ * Log how many cigarettes smoked today or a specific date
  */
 export default function DailyLoggerScreen() {
   const { colors } = useColorScheme();
   const router = useRouter();
+  const params = useLocalSearchParams();
   const profile = useUserStore((state) => state.profile);
   const { updateDailyStats, dailyStats } = useStatsStore();
+  
+  // Get target date from params or default to today
+  const today = new Date().toISOString().split('T')[0];
+  const targetDate = (params.date as string) || today;
+  const isToday = targetDate === today;
   
   const [cigaretteCount, setCigaretteCount] = useState('');
   const [showCelebration, setShowCelebration] = useState(false);
   const [previousDayCount, setPreviousDayCount] = useState(-1);
 
-  const today = new Date().toISOString().split('T')[0];
   const target = profile?.gradualCurrentTarget || 0;
   const countNum = parseInt(cigaretteCount, 10) || 0;
   const isValid = cigaretteCount.length > 0 && countNum >= 0 && countNum <= 50;
 
-  // Load today's data if exists
+  // Load target date's data if exists
   useEffect(() => {
-    const todayStats = dailyStats.find(s => s.date === today);
-    if (todayStats) {
-      setCigaretteCount(todayStats.cigarettesSmoked.toString());
-      setPreviousDayCount(todayStats.cigarettesSmoked);
+    const targetStats = dailyStats.find(s => s.date === targetDate);
+    if (targetStats) {
+      setCigaretteCount(targetStats.cigarettesSmoked.toString());
+      setPreviousDayCount(targetStats.cigarettesSmoked);
     }
-  }, [dailyStats, today]);
+  }, [dailyStats, targetDate]);
 
   const handleSave = async () => {
     if (!isValid || !profile) return;
 
     const count = parseInt(cigaretteCount, 10);
     
-    // Update daily stats
-    await updateDailyStats(today, {
+    // Update daily stats for target date
+    await updateDailyStats(targetDate, {
       cigarettesSmoked: count,
       smokeFree: count === 0,
       targetCigarettes: target,
@@ -92,7 +98,7 @@ export default function DailyLoggerScreen() {
             {/* Question */}
             <View style={styles.questionSection}>
               <Text style={[styles.question, { color: colors.text }]}>
-                Bugün kaç sigara içtin? 🚬
+                {isToday ? 'Bugün' : formatDateShort(targetDate)} kaç sigara içtin? 🚬
               </Text>
               
               <Text style={[styles.targetHint, { color: colors.textSecondary }]}>

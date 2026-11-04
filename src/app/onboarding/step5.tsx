@@ -34,7 +34,7 @@ export default function OnboardingStep5() {
   const handleContinue = () => {
     if (isValid) {
       setStep5Data(targetNum);
-      router.push('/onboarding/step6');
+      router.push('/onboarding/step5-plan');
     }
   };
 
@@ -106,7 +106,7 @@ export default function OnboardingStep5() {
           {/* Tip */}
           <View style={[styles.tipBox, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
             <Text style={[styles.tipText, { color: colors.textSecondary }]}>
-              💡 İlk hedef günlük sigaranın %20-30'unu azaltmak olabilir
+              💡 İlk hedef günlük sigaranın %20-30&apos;unu azaltmak olabilir
             </Text>
           </View>
 

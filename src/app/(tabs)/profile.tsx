@@ -5,6 +5,7 @@ import { useStatsStore } from '@/store/statsStore';
 import { useAchievementStore } from '@/store/achievementStore';
 import { storage } from '@/utils/storage';
 import { calculateStreakFromQuitDate, getTodayString } from '@/utils/dateHelpers';
+import { getCurrentGradualTarget } from '@/utils/gradualHelpers';
 import { Spacing, Typography, BorderRadius } from '@/constants';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -239,6 +240,53 @@ export default function ProfileScreen() {
               </Text>
             </View>
           </View>
+
+          {/* Gradual Target Adjustment */}
+          {profile.quitMethod === 'gradual' && (
+            <TouchableOpacity 
+              style={styles.infoItem}
+              onPress={() => {
+                const currentTarget = getCurrentGradualTarget(profile);
+                Alert.prompt(
+                  'Hedef Değiştir',
+                  `Şu anki hedef: ${currentTarget} sigara/gün\n\nYeni hedef (sadece azaltma):`,
+                  [
+                    { text: 'İptal', style: 'cancel' },
+                    { 
+                      text: 'Kaydet',
+                      onPress: (newTargetStr) => {
+                        const newTarget = parseInt(newTargetStr || '', 10);
+                        if (isNaN(newTarget) || newTarget < 0) {
+                          Alert.alert('Hata', 'Geçerli bir sayı gir');
+                          return;
+                        }
+                        if (newTarget >= currentTarget) {
+                          Alert.alert('Hata', 'Yeni hedef mevcut hedeften düşük olmalı');
+                          return;
+                        }
+                        updateProfile({ gradualCurrentTarget: newTarget });
+                        Alert.alert('Başarılı', `Hedef ${newTarget} sigara/gün olarak güncellendi`);
+                      }
+                    }
+                  ],
+                  'plain-text',
+                  String(currentTarget)
+                );
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="trending-down" size={20} color={colors.primary} />
+              <View style={styles.infoContent}>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>
+                  Günlük Hedef (Tıkla değiştir)
+                </Text>
+                <Text style={[styles.infoValue, { color: colors.primary }]}>
+                  {getCurrentGradualTarget(profile)} sigara
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+            </TouchableOpacity>
+          )}
 
           <View style={styles.infoItem}>
             <Ionicons name="snow" size={20} color={colors.accent} />

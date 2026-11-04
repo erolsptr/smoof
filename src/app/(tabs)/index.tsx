@@ -5,6 +5,7 @@ import { useUserStore } from '@/store/userStore';
 import { useStatsStore } from '@/store/statsStore';
 import { useAchievementStore } from '@/store/achievementStore';
 import { calculateStreakFromQuitDate } from '@/utils/dateHelpers';
+import { getCurrentGradualTarget, getNextWeekTarget, getLastNDays, getDayName } from '@/utils/gradualHelpers';
 import { Spacing, Typography, BorderRadius } from '@/constants';
 import { useState, useEffect, useRef } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -494,9 +495,10 @@ export default function HomeScreen() {
   // GRADUAL MODE - Different UI for gradual reduction users
   if (profile?.quitMethod === 'gradual') {
     const today = new Date().toISOString().split('T')[0];
-    const todayStats = useStatsStore.getState().dailyStats.find(s => s.date === today);
+    const allDailyStats = useStatsStore.getState().dailyStats;
+    const todayStats = allDailyStats.find(s => s.date === today);
     const todayCigarettes = todayStats?.cigarettesSmoked || 0;
-    const target = profile.gradualCurrentTarget || 0;
+    const target = getCurrentGradualTarget(profile);
     const smokeFreeStreak = useStatsStore.getState().smokeFreeStreak;
     const startCount = profile.gradualStartCount || profile.dailyCigaretteCount;
     const reductionPercent = startCount > 0 
@@ -689,6 +691,87 @@ export default function HomeScreen() {
           <View style={styles.reductionPercentBox}>
             <Text style={[styles.reductionPercent, { color: colors.primary }]}>
               %{reductionPercent} azalttın! 🎯
+            </Text>
+          </View>
+        </View>
+
+        {/* Weekly Calendar */}
+        <View style={[styles.weeklySection, { 
+          backgroundColor: colors.card,
+          borderColor: colors.cardBorder,
+        }]}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Bu Hafta
+            </Text>
+            <TouchableOpacity 
+              onPress={() => router.push('/calendar')}
+              style={styles.detailButton}
+            >
+              <Ionicons name="calendar" size={20} color={colors.primary} />
+              <Text style={[styles.detailButtonText, { color: colors.primary }]}>
+                Detay
+              </Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.weekGrid}>
+            {getLastNDays(7).map((date, index) => {
+              const dayStats = allDailyStats.find(s => s.date === date);
+              const cigaretteCount = dayStats?.cigarettesSmoked || 0;
+              const dayTarget = dayStats?.targetCigarettes || getCurrentGradualTarget(profile);
+              const isToday = date === today;
+              
+              let status: 'perfect' | 'good' | 'over' | 'empty' = 'empty';
+              if (dayStats) {
+                if (cigaretteCount === 0) status = 'perfect';
+                else if (cigaretteCount <= dayTarget) status = 'good';
+                else status = 'over';
+              }
+              
+              return (
+                <TouchableOpacity 
+                  key={date}
+                  style={[
+                    styles.dayCell,
+                    styles[`dayCell_${status}`],
+                    { borderColor: colors.cardBorder },
+                    isToday && styles.dayCell_today,
+                  ]}
+                  onPress={() => router.push(`/daily-logger?date=${date}`)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.dayName, 
+                    { color: colors.textSecondary },
+                    status === 'perfect' && { color: '#10B981' },
+                    status === 'good' && { color: '#3B82F6' },
+                    status === 'over' && { color: '#EF4444' },
+                  ]}>
+                    {getDayName(date, index)}
+                  </Text>
+                  <Text style={[
+                    styles.dayCigarettes, 
+                    { color: colors.text },
+                    status === 'perfect' && { color: '#10B981' },
+                    status === 'good' && { color: '#3B82F6' },
+                    status === 'over' && { color: '#EF4444' },
+                  ]}>
+                    {dayStats ? cigaretteCount : '-'}
+                  </Text>
+                  <Text style={[styles.dayTarget, { color: colors.textSecondary }]}>
+                    /{dayTarget}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Next week preview */}
+          <View style={[styles.nextWeekPreview, { backgroundColor: colors.primary + '10' }]}>
+            <Ionicons name="trending-down" size={20} color={colors.primary} />
+            <Text style={[styles.nextWeekText, { color: colors.primary }]}>
+              Gelecek hafta hedef: {getNextWeekTarget(profile)} sigara
             </Text>
           </View>
         </View>
@@ -1296,5 +1379,89 @@ const styles = StyleSheet.create({
   reductionPercent: {
     fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
+  },
+  // Weekly calendar styles
+  weeklySection: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  detailButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  detailButtonText: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
+  },
+  weekGrid: {
+    flexDirection: 'row',
+    gap: 4,
+    marginBottom: Spacing.md,
+  },
+  dayCell: {
+    flex: 1,
+    padding: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+    alignItems: 'center',
+    minHeight: 60,
+    borderWidth: 1,
+  },
+  dayCell_perfect: {
+    backgroundColor: '#10B981' + '20',
+    borderColor: '#10B981',
+    borderWidth: 2,
+  },
+  dayCell_good: {
+    backgroundColor: '#3B82F6' + '20',
+    borderColor: '#3B82F6',
+    borderWidth: 2,
+  },
+  dayCell_over: {
+    backgroundColor: '#EF4444' + '20',
+    borderColor: '#EF4444',
+    borderWidth: 1,
+  },
+  dayCell_empty: {
+    backgroundColor: 'transparent',
+  },
+  dayCell_today: {
+    borderWidth: 3,
+  },
+  dayName: {
+    fontSize: Typography.sizes.xs,
+    marginBottom: 4,
+    fontWeight: Typography.weights.semibold,
+  },
+  dayCigarettes: {
+    fontSize: Typography.sizes.lg,
+    fontWeight: Typography.weights.bold,
+  },
+  dayTarget: {
+    fontSize: Typography.sizes.xs,
+  },
+  nextWeekPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.md,
+  },
+  nextWeekText: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
   },
 });
