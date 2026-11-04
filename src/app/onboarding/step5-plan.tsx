@@ -28,10 +28,10 @@ export default function OnboardingStep5Plan() {
   const dailyCigs = data.dailyCigarettes || 0;
   
   const planOptions = [
-    { weeks: 4, label: 'Hızlı', icon: '🚀', color: '#EF4444' },
-    { weeks: 6, label: 'Dengeli', icon: '⭐', color: '#F59E0B', recommended: true },
-    { weeks: 8, label: 'Rahat', icon: '🎯', color: '#3B82F6' },
-    { weeks: 12, label: 'Çok Rahat', icon: '🌱', color: '#10B981' },
+    { weeks: 4, label: 'Hızlı', icon: '🚀', colorKey: 'error' as const },
+    { weeks: 6, label: 'Dengeli', icon: '⭐', colorKey: 'warning' as const, recommended: true },
+    { weeks: 8, label: 'Rahat', icon: '🎯', colorKey: 'info' as const },
+    { weeks: 12, label: 'Çok Rahat', icon: '🌱', colorKey: 'success' as const },
   ];
 
   const calculateWeeklyReduction = (weeks: number) => {
@@ -82,6 +82,7 @@ export default function OnboardingStep5Plan() {
           {planOptions.map((option) => {
             const weeklyReduction = calculateWeeklyReduction(option.weeks);
             const isSelected = selectedWeeks === option.weeks;
+            const optionColor = colors[option.colorKey];
             
             return (
               <TouchableOpacity
@@ -89,8 +90,8 @@ export default function OnboardingStep5Plan() {
                 style={[
                   styles.planCard,
                   {
-                    backgroundColor: isSelected ? option.color : colors.card,
-                    borderColor: isSelected ? option.color : colors.cardBorder,
+                    backgroundColor: isSelected ? optionColor : colors.card,
+                    borderColor: isSelected ? optionColor : colors.cardBorder,
                   },
                 ]}
                 onPress={() => setSelectedWeeks(option.weeks)}
@@ -110,11 +111,11 @@ export default function OnboardingStep5Plan() {
                         {option.recommended && (
                           <View style={[
                             styles.recommendedBadge,
-                            { backgroundColor: isSelected ? 'rgba(255,255,255,0.3)' : option.color + '20' }
+                            { backgroundColor: isSelected ? 'rgba(255,255,255,0.3)' : optionColor + '20' }
                           ]}>
                             <Text style={[
                               styles.recommendedText,
-                              { color: isSelected ? '#FFFFFF' : option.color }
+                              { color: isSelected ? '#FFFFFF' : optionColor }
                             ]}>
                               Önerilen
                             </Text>

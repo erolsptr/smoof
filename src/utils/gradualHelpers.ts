@@ -9,10 +9,17 @@ export function getCurrentGradualTarget(profile: UserProfile): number {
     return 0;
   }
   
-  const startDate = new Date(profile.gradualStartDate);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  startDate.setHours(0, 0, 0, 0);
+  // Parse dates in local timezone consistently
+  const startDateStr = profile.gradualStartDate.split('T')[0]; // "2024-01-15"
+  const startParts = startDateStr.split('-').map(Number);
+  
+  const todayDate = new Date();
+  const todayStr = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
+  const todayParts = todayStr.split('-').map(Number);
+  
+  // Create dates at midnight local time
+  const startDate = new Date(startParts[0], startParts[1] - 1, startParts[2]);
+  const today = new Date(todayParts[0], todayParts[1] - 1, todayParts[2]);
   
   const daysPassed = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
   const weeksPassed = Math.floor(daysPassed / 7);
@@ -70,11 +77,15 @@ export function getLastNDays(n: number): string[] {
  * Tarih için gün adını döndürür (Pzt, Sal, vb.)
  */
 export function getDayName(dateString: string, index?: number): string {
-  const date = new Date(dateString);
+  // Parse in local timezone
+  const parts = dateString.split('-').map(Number);
+  const date = new Date(parts[0], parts[1] - 1, parts[2]);
   const dayNames = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
   
-  // Bugünse "Bugün" yaz
-  const today = new Date().toISOString().split('T')[0];
+  // Compare with today in local format
+  const todayDate = new Date();
+  const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
+  
   if (dateString === today) {
     return 'Bugün';
   }

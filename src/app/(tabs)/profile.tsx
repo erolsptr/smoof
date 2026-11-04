@@ -257,15 +257,20 @@ export default function ProfileScreen() {
                       onPress: (newTargetStr) => {
                         const newTarget = parseInt(newTargetStr || '', 10);
                         if (isNaN(newTarget) || newTarget < 0) {
-                          Alert.alert('Hata', 'Geçerli bir sayı gir');
+                          Alert.alert('Hata', 'Geçerli bir sayı gir (0 veya daha büyük)');
                           return;
                         }
-                        if (newTarget >= currentTarget) {
-                          Alert.alert('Hata', 'Yeni hedef mevcut hedeften düşük olmalı');
+                        if (newTarget > currentTarget) {
+                          Alert.alert('Hata', 'Yeni hedef mevcut hedeften yüksek olamaz');
                           return;
                         }
                         updateProfile({ gradualCurrentTarget: newTarget });
-                        Alert.alert('Başarılı', `Hedef ${newTarget} sigara/gün olarak güncellendi`);
+                        Alert.alert(
+                          'Başarılı', 
+                          newTarget === 0 
+                            ? '🎉 Hedef 0! Artık sigarasızsın!' 
+                            : `Hedef ${newTarget} sigara/gün olarak güncellendi`
+                        );
                       }
                     }
                   ],

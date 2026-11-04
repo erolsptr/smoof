@@ -58,7 +58,10 @@ export default function CalendarScreen() {
 
   const getDayStatus = (day: number): { status: 'perfect' | 'good' | 'over' | 'future' | 'empty', count: number, target: number } => {
     const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const today = new Date().toISOString().split('T')[0];
+    
+    // Create today in same format (local date)
+    const todayDate = new Date();
+    const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
     
     // Future dates
     if (dateString > today) {
@@ -90,7 +93,10 @@ export default function CalendarScreen() {
 
   const handleDayPress = (day: number) => {
     const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const today = new Date().toISOString().split('T')[0];
+    
+    // Create today in same format (local date)
+    const todayDate = new Date();
+    const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
     
     // Only allow editing past and today
     if (dateString <= today) {
@@ -145,15 +151,15 @@ export default function CalendarScreen() {
         {/* Legend */}
         <View style={[styles.legend, { backgroundColor: colors.card }]}>
           <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#10B981' }]} />
+            <View style={[styles.legendDot, { backgroundColor: colors.success }]} />
             <Text style={[styles.legendText, { color: colors.textSecondary }]}>0 sigara</Text>
           </View>
           <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#3B82F6' }]} />
+            <View style={[styles.legendDot, { backgroundColor: colors.info }]} />
             <Text style={[styles.legendText, { color: colors.textSecondary }]}>Hedefte</Text>
           </View>
           <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
+            <View style={[styles.legendDot, { backgroundColor: colors.error }]} />
             <Text style={[styles.legendText, { color: colors.textSecondary }]}>Hedef aşıldı</Text>
           </View>
         </View>
@@ -187,6 +193,18 @@ export default function CalendarScreen() {
                   styles.dayCell,
                   styles[`dayCell_${status}`],
                   { borderColor: colors.cardBorder },
+                  status === 'perfect' && { 
+                    backgroundColor: colors.success + '20',
+                    borderColor: colors.success,
+                  },
+                  status === 'good' && { 
+                    backgroundColor: colors.info + '20',
+                    borderColor: colors.info,
+                  },
+                  status === 'over' && { 
+                    backgroundColor: colors.error + '20',
+                    borderColor: colors.error,
+                  },
                 ]}
                 onPress={() => handleDayPress(day)}
                 disabled={isFuture}
@@ -195,9 +213,9 @@ export default function CalendarScreen() {
                 <Text style={[
                   styles.dayNumber,
                   { color: isFuture ? colors.textTertiary : colors.text },
-                  status === 'perfect' && { color: '#10B981' },
-                  status === 'good' && { color: '#3B82F6' },
-                  status === 'over' && { color: '#EF4444' },
+                  status === 'perfect' && { color: colors.success },
+                  status === 'good' && { color: colors.info },
+                  status === 'over' && { color: colors.error },
                 ]}>
                   {day}
                 </Text>
@@ -309,18 +327,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   dayCell_perfect: {
-    backgroundColor: '#10B981' + '20',
-    borderColor: '#10B981',
+    backgroundColor: 'transparent', // Will be overridden with theme color + opacity
     borderWidth: 2,
   },
   dayCell_good: {
-    backgroundColor: '#3B82F6' + '20',
-    borderColor: '#3B82F6',
+    backgroundColor: 'transparent', // Will be overridden with theme color + opacity
     borderWidth: 2,
   },
   dayCell_over: {
-    backgroundColor: '#EF4444' + '20',
-    borderColor: '#EF4444',
+    backgroundColor: 'transparent', // Will be overridden with theme color + opacity
     borderWidth: 1,
   },
   dayCell_future: {
