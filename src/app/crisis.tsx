@@ -177,10 +177,10 @@ export default function CrisisScreen() {
     return messages[Math.floor(Math.random() * messages.length)];
   });
   
-  // Breathe animation scale
+  // Breathe animation scale - stronger animation
   const breathScale = breatheAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [1, 1.3],
+    outputRange: [1, 1.5], // Increased from 1.3 to 1.5 for more prominent animation
   });
   
   if (showResult) {
@@ -410,17 +410,31 @@ export default function CrisisScreen() {
       {/* Mascot */}
       <View style={styles.mascotContainer}>
         {isBreathing ? (
-          <Animated.View style={{ transform: [{ scale: breathScale }] }}>
+          <Animated.View style={{ 
+            transform: [{ scale: breathScale }],
+            alignItems: 'center',
+          }}>
             <Image 
               source={require('../../assets/smoof.png')}
-              style={styles.mascot}
+              style={styles.mascotLarge}
               resizeMode="contain"
             />
+            {/* Breath phase indicator */}
+            <View style={[styles.breathPhaseIndicator, { 
+              backgroundColor: colors.accent + '20' 
+            }]}>
+              <Text style={styles.breathPhaseIcon}>
+                {breathPhase === 'inhale' ? '⬇️' : '⬆️'}
+              </Text>
+              <Text style={[styles.breathPhaseText, { color: colors.accent }]}>
+                {breathPhase === 'inhale' ? 'NEFES AL' : 'NEFES VER'}
+              </Text>
+            </View>
           </Animated.View>
         ) : (
           <Image 
             source={require('../../assets/smoof.png')}
-            style={styles.mascot}
+            style={styles.mascotLarge}
             resizeMode="contain"
           />
         )}
@@ -461,12 +475,6 @@ export default function CrisisScreen() {
           {isBreathing ? '🫁 Nefes Alıyorum...' : '🫁 Nefes Egzersizi Başlat'}
         </Text>
       </TouchableOpacity>
-      
-      {isBreathing && (
-        <Text style={[styles.breathInstruction, { color: colors.textSecondary }]}>
-          {breathPhase === 'inhale' ? 'Nefes Al... 😤' : 'Nefes Ver... 😮‍💨'}
-        </Text>
-      )}
       
       {/* Action Buttons */}
       <View style={styles.actions}>
@@ -519,6 +527,26 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
   },
+  mascotLarge: {
+    width: 180, // Increased from 100 to 180
+    height: 180,
+  },
+  breathPhaseIndicator: {
+    marginTop: 24,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 24,
+    alignItems: 'center',
+    gap: 8,
+  },
+  breathPhaseIcon: {
+    fontSize: 32,
+  },
+  breathPhaseText: {
+    fontSize: 24,
+    fontWeight: Typography.weights.bold,
+    letterSpacing: 2,
+  },
   timerCard: {
     marginHorizontal: Spacing.lg,
     marginBottom: Spacing.lg,
@@ -555,12 +583,6 @@ const styles = StyleSheet.create({
   },
   breathButtonText: {
     fontSize: Typography.sizes.base,
-    fontWeight: Typography.weights.bold,
-  },
-  breathInstruction: {
-    fontSize: Typography.sizes.xl,
-    textAlign: 'center',
-    marginBottom: Spacing.lg,
     fontWeight: Typography.weights.bold,
   },
   actions: {
