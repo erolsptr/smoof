@@ -5,7 +5,7 @@ import { useUserStore } from '@/store/userStore';
 import { useStatsStore } from '@/store/statsStore';
 import { useAchievementStore } from '@/store/achievementStore';
 import { calculateStreakFromQuitDate } from '@/utils/dateHelpers';
-import { getCurrentGradualTarget, getNextWeekTarget, getLastNDays, getDayName } from '@/utils/gradualHelpers';
+import { getCurrentGradualTarget, getLastNDays, getDayName } from '@/utils/gradualHelpers';
 import { calculateGradualCigarettesAvoided, calculateGradualMoneySaved } from '@/utils/gradualStatsCalculator';
 import { Spacing, Typography, BorderRadius } from '@/constants';
 import { useState, useEffect, useRef } from 'react';
@@ -609,10 +609,6 @@ export default function HomeScreen() {
     const todayCigarettes = todayStats?.cigarettesSmoked || 0;
     const target = getCurrentGradualTarget(profile);
     const smokeFreeStreak = useStatsStore.getState().smokeFreeStreak;
-    const startCount = profile.gradualStartCount || profile.dailyCigaretteCount;
-    const reductionPercent = startCount > 0 
-      ? Math.floor(((startCount - target) / startCount) * 100)
-      : 0;
 
     return (
       <ScrollView 
@@ -677,10 +673,7 @@ export default function HomeScreen() {
                 </Text>
               </View>
               <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-                {profile?.quitMethod === 'gradual'
-                  ? 'Hedefini aştığın günlerde freeze kullanarak disiplin günü streak\'ini koruyabilirsin.'
-                  : 'Kayma anında freeze kullanarak sigarasız günlerini koruyabilirsin.'
-                }
+                Hedefini aştığın günlerde freeze kullanarak disiplin günü streak'ini koruyabilirsin.
               </Text>
               <View style={styles.infoStats}>
                 <Text style={[styles.infoStatsText, { color: colors.text }]}>
@@ -691,187 +684,12 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </Modal>
 
-        {/* Discipline Streak Card */}
-        <Animated.View 
-          style={[
-            { 
-              opacity: streakOpacity,
-              transform: [{ scale: streakScale }]
-            }
-          ]}
-        >
-          <LinearGradient
-            colors={[colors.primary, colors.primaryDark]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.streakCard}
-          >
-            <View style={styles.streakIconContainer}>
-              <Ionicons name="fitness" size={32} color="#FFF" />
-            </View>
-            <Text style={styles.streakLabel}>Disiplin Günü</Text>
-            <View style={styles.streakRow}>
-              <Text style={styles.streakNumber}>{currentStreak}</Text>
-              <Text style={styles.streakDays}>GÜN</Text>
-            </View>
-          </LinearGradient>
-        </Animated.View>
-
-        {/* Today's Goal Card */}
-        <View style={[styles.goalCard, { 
-          backgroundColor: colors.card,
-          borderColor: colors.cardBorder,
-        }]}>
-          <View style={styles.goalHeader}>
-            <Text style={[styles.goalTitle, { color: colors.text }]}>
-              Bugün Hedef
-            </Text>
-            <TouchableOpacity
-              style={[styles.updateButton, { backgroundColor: colors.primary }]}
-              onPress={() => router.push('/daily-logger')}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.updateButtonText}>Güncelle</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.goalContent}>
-            <View style={styles.goalStat}>
-              <Text style={[styles.goalLabel, { color: colors.textSecondary }]}>
-                Hedef
-              </Text>
-              <Text style={[styles.goalValue, { color: colors.text }]}>
-                {target} sigara
-              </Text>
-            </View>
-            
-            <View style={styles.goalDivider} />
-            
-            <View style={styles.goalStat}>
-              <Text style={[styles.goalLabel, { color: colors.textSecondary }]}>
-                İçtiğin
-              </Text>
-              <View style={styles.goalValueRow}>
-                <Text style={[styles.goalValue, { 
-                  color: todayCigarettes <= target ? colors.success : colors.error 
-                }]}>
-                  {todayCigarettes}
-                </Text>
-                <Ionicons 
-                  name={todayCigarettes <= target ? 'checkmark-circle' : 'alert-circle'} 
-                  size={24} 
-                  color={todayCigarettes <= target ? colors.success : colors.error} 
-                />
-              </View>
-            </View>
-          </View>
-
-          {/* Progress bar */}
-          <View style={[styles.progressBarContainer, { backgroundColor: colors.cardBorder }]}>
-            <View 
-              style={[
-                styles.progressBarFill, 
-                { 
-                  backgroundColor: target > 0 
-                    ? (todayCigarettes / target > 1 ? colors.error : colors.primary)
-                    : colors.success,
-                  width: target > 0 
-                    ? `${Math.min((todayCigarettes / target) * 100, 100)}%`
-                    : '100%',
-                }
-              ]} 
-            />
-          </View>
-        </View>
-
-        {/* Smoke-Free Streak (if any) */}
-        {smokeFreeStreak > 0 && (
-          <View style={[styles.smokeFreeCard, { 
-            backgroundColor: colors.success + '20',
-            borderColor: colors.success,
-          }]}>
-            <Ionicons name="star" size={32} color={colors.success} />
-            <View style={styles.smokeFreeContent}>
-              <Text style={[styles.smokeFreeLabel, { color: colors.success }]}>
-                Sigarasız Gün
-              </Text>
-              <Text style={[styles.smokeFreeValue, { color: colors.success }]}>
-                {smokeFreeStreak} GÜN
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* Reduction Progress */}
-        <View style={[styles.reductionCard, { 
-          backgroundColor: colors.card,
-          borderColor: colors.cardBorder,
-        }]}>
+        {/* Takvim - BÜYÜK */}
+        <View style={styles.calendarSection}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Azaltma İlerlemeniz
+            Bu Hafta
           </Text>
-          
-          <View style={styles.reductionStats}>
-            <View style={styles.reductionStat}>
-              <Text style={[styles.reductionLabel, { color: colors.textSecondary }]}>
-                Başlangıç
-              </Text>
-              <Text style={[styles.reductionValue, { color: colors.text }]}>
-                {startCount}
-              </Text>
-            </View>
-            
-            <Ionicons name="arrow-forward" size={24} color={colors.textSecondary} />
-            
-            <View style={styles.reductionStat}>
-              <Text style={[styles.reductionLabel, { color: colors.textSecondary }]}>
-                Şimdi
-              </Text>
-              <Text style={[styles.reductionValue, { color: colors.primary }]}>
-                {target}
-              </Text>
-            </View>
-            
-            <Ionicons name="arrow-forward" size={24} color={colors.textSecondary} />
-            
-            <View style={styles.reductionStat}>
-              <Text style={[styles.reductionLabel, { color: colors.textSecondary }]}>
-                Hedef
-              </Text>
-              <Text style={[styles.reductionValue, { color: colors.success }]}>
-                0
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.reductionPercentBox}>
-            <Text style={[styles.reductionPercent, { color: colors.primary }]}>
-              %{reductionPercent} azalttın! 🎯
-            </Text>
-          </View>
-        </View>
-
-        {/* Weekly Calendar */}
-        <View style={[styles.weeklySection, { 
-          backgroundColor: colors.card,
-          borderColor: colors.cardBorder,
-        }]}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Bu Hafta
-            </Text>
-            <TouchableOpacity 
-              onPress={() => router.push('/calendar')}
-              style={styles.detailButton}
-            >
-              <Ionicons name="calendar" size={20} color={colors.primary} />
-              <Text style={[styles.detailButtonText, { color: colors.primary }]}>
-                Detay
-              </Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.weekGrid}>
+          <View style={styles.weekGridLarge}>
             {getLastNDays(7).map((date, index) => {
               const dayStats = allDailyStats.find(s => s.date === date);
               const cigaretteCount = dayStats?.cigarettesSmoked || 0;
@@ -889,57 +707,102 @@ export default function HomeScreen() {
                 <TouchableOpacity 
                   key={date}
                   style={[
-                    styles.dayCell,
-                    styles[`dayCell_${status}`],
-                    { borderColor: colors.cardBorder },
-                    isToday && styles.dayCell_today,
+                    styles.dayCardLarge,
+                    { backgroundColor: colors.card },
+                    status === 'perfect' && { borderColor: colors.success, borderWidth: 2 },
+                    status === 'good' && { borderColor: colors.primary, borderWidth: 2 },
+                    status === 'over' && { borderColor: colors.error, borderWidth: 2 },
                   ]}
                   onPress={() => router.push(`/daily-logger?date=${date}`)}
-                  activeOpacity={0.7}
                 >
-                  <Text style={[
-                    styles.dayName, 
-                    { color: colors.textSecondary },
-                    status === 'perfect' && { color: '#10B981' },
-                    status === 'good' && { color: '#3B82F6' },
-                    status === 'over' && { color: '#EF4444' },
-                  ]}>
+                  <Text style={[styles.dayNameLarge, { color: colors.textSecondary }]}>
                     {getDayName(date, index)}
                   </Text>
-                  <Text style={[
-                    styles.dayCigarettes, 
-                    { color: colors.text },
-                    status === 'perfect' && { color: '#10B981' },
-                    status === 'good' && { color: '#3B82F6' },
-                    status === 'over' && { color: '#EF4444' },
-                  ]}>
+                  <Text style={[styles.dayCigarettesLarge, { color: colors.text }]}>
                     {dayStats ? cigaretteCount : '-'}
                   </Text>
-                  <Text style={[styles.dayTarget, { color: colors.textSecondary }]}>
+                  <Text style={[styles.dayTargetLarge, { color: colors.textSecondary }]}>
                     /{dayTarget}
                   </Text>
+                  <View style={[styles.dayStatus, { 
+                    backgroundColor: status === 'perfect' ? colors.success : 
+                                   status === 'good' ? colors.primary : 
+                                   status === 'over' ? colors.error : colors.cardBorder 
+                  }]}>
+                    <Ionicons 
+                      name={status === 'perfect' ? 'checkmark' : 
+                           status === 'good' ? 'checkmark' : 
+                           status === 'over' ? 'close' : 'remove'} 
+                      size={12} 
+                      color="#FFF" 
+                    />
+                  </View>
                 </TouchableOpacity>
               );
             })}
           </View>
+          <TouchableOpacity 
+            style={styles.calendarDetailButton}
+            onPress={() => router.push('/calendar')}
+          >
+            <Text style={{color: colors.primary}}>Detaylı Takvim</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
 
-          {/* Next week preview */}
-          <View style={[styles.nextWeekPreview, { backgroundColor: colors.primary + '10' }]}>
-            <Ionicons name="trending-down" size={20} color={colors.primary} />
-            <Text style={[styles.nextWeekText, { color: colors.primary }]}>
-              Gelecek hafta hedef: {getNextWeekTarget(profile)} sigara
+        {/* Disiplin & Sigarasız - KÜÇÜK (Yan Yana) */}
+        <View style={styles.compactStatsRow}>
+          <View style={[styles.compactStatCard, { backgroundColor: colors.card }]}>
+            <Text style={[styles.compactStatLabel, { color: colors.textSecondary }]}>
+              💪 Disiplin
             </Text>
+            <Text style={[styles.compactStatValue, { color: colors.text }]}>
+              {currentStreak} gün
+            </Text>
+          </View>
+          
+          {smokeFreeStreak > 0 && (
+            <View style={[styles.compactStatCard, { backgroundColor: colors.card }]}>
+              <Text style={[styles.compactStatLabel, { color: colors.textSecondary }]}>
+                🌟 Sigarasız
+              </Text>
+              <Text style={[styles.compactStatValue, { color: colors.text }]}>
+                {smokeFreeStreak} gün
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Bugün içilen - KÜÇÜK */}
+        <View style={[styles.todayCard, { backgroundColor: colors.card }]}>
+          <Text style={[styles.todayLabel, { color: colors.textSecondary }]}>
+            Bugün
+          </Text>
+          <View style={styles.todayRow}>
+            <Text style={[styles.todayValue, { color: colors.text }]}>
+              {todayCigarettes} / {target}
+            </Text>
+            <TouchableOpacity
+              style={[styles.todayButton, { backgroundColor: colors.primary }]}
+              onPress={() => router.push('/daily-logger')}
+            >
+              <Text style={{color: '#FFF', fontSize: 12}}>Güncelle</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Crisis Button */}
+        {/* Kriz butonu - Göze batmayan ama erişilebilir */}
         <TouchableOpacity
-          style={[styles.crisisButton, { backgroundColor: colors.error }]}
-          activeOpacity={0.8}
+          style={[styles.crisisButtonSubtle, { 
+            backgroundColor: colors.card,
+            borderColor: colors.error + '40',
+          }]}
           onPress={() => router.push('/crisis')}
         >
-          <Ionicons name="alert-circle" size={24} color="#FFFFFF" />
-          <Text style={styles.crisisText}>Sigara İçmek İstiyorum</Text>
+          <Ionicons name="shield-checkmark" size={20} color={colors.error} />
+          <Text style={[styles.crisisTextSubtle, { color: colors.error }]}>
+            İstek Yönetimi
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     );
@@ -1519,213 +1382,104 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.sm,
   },
   // Gradual mode styles
-  goalCard: {
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    marginBottom: Spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+  calendarSection: {
+    marginBottom: 16,
   },
-  goalHeader: {
+  weekGridLarge: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
+    gap: 8,
+    marginBottom: 12,
   },
-  goalTitle: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
-  },
-  updateButton: {
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.md,
-  },
-  updateButtonText: {
-    color: '#FFFFFF',
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
-  },
-  goalContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: Spacing.md,
-  },
-  goalStat: {
-    alignItems: 'center',
+  dayCardLarge: {
     flex: 1,
-  },
-  goalLabel: {
-    fontSize: Typography.sizes.sm,
-    marginBottom: Spacing.xs,
-  },
-  goalValue: {
-    fontSize: Typography.sizes['2xl'],
-    fontWeight: Typography.weights.bold,
-  },
-  goalValueRow: {
-    flexDirection: 'row',
+    padding: 12,
+    borderRadius: 12,
     alignItems: 'center',
-    gap: Spacing.xs,
+    minHeight: 90,
+    position: 'relative',
   },
-  goalDivider: {
-    width: 1,
-    backgroundColor: '#E5E7EB',
-  },
-  progressBarContainer: {
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  smokeFreeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 2,
-    marginBottom: Spacing.lg,
-    gap: Spacing.md,
-  },
-  smokeFreeContent: {
-    flex: 1,
-  },
-  smokeFreeLabel: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.medium,
-    marginBottom: 2,
-  },
-  smokeFreeValue: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: Typography.weights.bold,
-  },
-  reductionCard: {
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    marginBottom: Spacing.lg,
-    gap: Spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  reductionStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-  },
-  reductionStat: {
-    alignItems: 'center',
-  },
-  reductionLabel: {
-    fontSize: Typography.sizes.xs,
-    marginBottom: Spacing.xs,
-  },
-  reductionValue: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: Typography.weights.bold,
-  },
-  reductionPercentBox: {
-    alignItems: 'center',
-    paddingTop: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-  },
-  reductionPercent: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
-  },
-  // Weekly calendar styles
-  weeklySection: {
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    marginBottom: Spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-  },
-  detailButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
-  detailButtonText: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
-  },
-  weekGrid: {
-    flexDirection: 'row',
-    gap: 4,
-    marginBottom: Spacing.md,
-  },
-  dayCell: {
-    flex: 1,
-    padding: Spacing.xs,
-    borderRadius: BorderRadius.sm,
-    alignItems: 'center',
-    minHeight: 60,
-    borderWidth: 1,
-  },
-  dayCell_perfect: {
-    backgroundColor: '#10B981' + '20',
-    borderColor: '#10B981',
-    borderWidth: 2,
-  },
-  dayCell_good: {
-    backgroundColor: '#3B82F6' + '20',
-    borderColor: '#3B82F6',
-    borderWidth: 2,
-  },
-  dayCell_over: {
-    backgroundColor: '#EF4444' + '20',
-    borderColor: '#EF4444',
-    borderWidth: 1,
-  },
-  dayCell_empty: {
-    backgroundColor: 'transparent',
-  },
-  dayCell_today: {
-    borderWidth: 3,
-  },
-  dayName: {
-    fontSize: Typography.sizes.xs,
+  dayNameLarge: { 
+    fontSize: 12, 
     marginBottom: 4,
-    fontWeight: Typography.weights.semibold,
   },
-  dayCigarettes: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
+  dayCigarettesLarge: { 
+    fontSize: 24, 
+    fontWeight: 'bold',
   },
-  dayTarget: {
-    fontSize: Typography.sizes.xs,
+  dayTargetLarge: { 
+    fontSize: 14,
   },
-  nextWeekPreview: {
+  dayStatus: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarDetailButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.md,
+    justifyContent: 'center',
+    gap: 4,
+    padding: 8,
   },
-  nextWeekText: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
+  compactStatsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  compactStatCard: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  compactStatLabel: { 
+    fontSize: 12, 
+    marginBottom: 4,
+  },
+  compactStatValue: { 
+    fontSize: 20, 
+    fontWeight: 'bold',
+  },
+  todayCard: {
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  todayLabel: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  todayRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  todayValue: { 
+    fontSize: 18, 
+    fontWeight: 'bold',
+  },
+  todayButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  crisisButtonSubtle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  crisisTextSubtle: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
