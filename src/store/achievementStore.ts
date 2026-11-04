@@ -15,7 +15,7 @@ interface AchievementState {
   lastCheckedCrises: number;
   
   // Actions
-  checkAndUnlockAchievements: (streak: number, savings: number, crises: number, hasSlipped: boolean, profile?: any) => Promise<Achievement[]>;
+  checkAndUnlockAchievements: (streak: number, savings: number, crises: number, hasSlipped: boolean, profile?: any, smokeFreeStreak?: number) => Promise<Achievement[]>;
   checkTimedHealthAchievements: (quitDate: string) => Promise<Achievement[]>;
   unlockAchievement: (achievementId: string) => Promise<void>;
   isUnlocked: (achievementId: string) => boolean;
@@ -32,13 +32,49 @@ export const useAchievementStore = create<AchievementState>((set, get) => ({
   lastCheckedSavings: 0,
   lastCheckedCrises: 0,
   
-  checkAndUnlockAchievements: async (streak: number, savings: number, crises: number, hasSlipped: boolean, profile?: any) => {
+  checkAndUnlockAchievements: async (streak: number, savings: number, crises: number, hasSlipped: boolean, profile?: any, smokeFreeStreak?: number) => {
     const newlyUnlocked: Achievement[] = [];
     const { unlockedAchievements } = get();
     
-    // Check streak achievements (for immediate mode)
+    // Helper function to determine the correct value for each achievement type
+    const getCurrentValue = (achievement: Achievement) => {
+      // Sigarasız streak rozetleri - sadece smokeFreeStreak kullan
+      if (achievement.category === 'streak') {
+        // Kademeli modda sigarasız gün rozetleri için smokeFreeStreak
+        // Immediate modda currentStreak zaten sigarasız günler
+        return profile?.quitMethod === 'gradual' ? (smokeFreeStreak || 0) : streak;
+      }
+      
+      // Health rozetleri - sigarasız günler (smokeFreeStreak)
+      if (achievement.category === 'health' && achievement.requirement > 0) {
+        return profile?.quitMethod === 'gradual' ? (smokeFreeStreak || 0) : streak;
+      }
+      
+      // Gradual rozetleri - disiplin günü (currentStreak)
+      if (achievement.category === 'gradual') {
+        return streak; // Disiplin günü
+      }
+      
+      // Savings - kademeli hesaplama (zaten düzeltildi özellik 3'te)
+      if (achievement.category === 'savings') {
+        return savings;
+      }
+      
+      // Resistance
+      if (achievement.category === 'resistance') {
+        if (achievement.id.startsWith('crisis_')) {
+          return crises;
+        }
+        // no-slip: smokeFreeStreak kullan
+        return profile?.quitMethod === 'gradual' ? (smokeFreeStreak || 0) : streak;
+      }
+      
+      return 0;
+    };
+    
+    // Check streak achievements (smoke-free days)
     const streakAchievements = ACHIEVEMENTS.filter(
-      a => a.category === 'streak' && a.requirement <= streak && !unlockedAchievements.includes(a.id)
+      a => a.category === 'streak' && a.requirement <= getCurrentValue(a) && !unlockedAchievements.includes(a.id)
     );
     
     // Check savings achievements
@@ -46,11 +82,11 @@ export const useAchievementStore = create<AchievementState>((set, get) => ({
       a => a.category === 'savings' && a.requirement <= savings && !unlockedAchievements.includes(a.id)
     );
     
-    // Check health achievements (streak-based)
+    // Check health achievements (smoke-free days)
     const healthAchievements = ACHIEVEMENTS.filter(
       a => a.category === 'health' && 
       a.requirement > 0 && 
-      a.requirement <= streak && 
+      a.requirement <= getCurrentValue(a) && 
       !unlockedAchievements.includes(a.id)
     );
     
@@ -62,11 +98,11 @@ export const useAchievementStore = create<AchievementState>((set, get) => ({
       !unlockedAchievements.includes(a.id)
     );
     
-    // Check no-slip achievements
+    // Check no-slip achievements (smoke-free days)
     const noSlipAchievements = ACHIEVEMENTS.filter(
       a => a.category === 'resistance' && 
       a.id.startsWith('no_slip_') && 
-      a.requirement <= streak && 
+      a.requirement <= getCurrentValue(a) && 
       !hasSlipped &&
       !unlockedAchievements.includes(a.id)
     );

@@ -131,9 +131,10 @@ export default function HomeScreen() {
           : Math.floor((cigarettesNotSmoked / profile.cigarettesPerPack) * profile.packPrice);
         const crisesHandled = crisisLogs.length; // Use actual crisis count
         const hasSlipped = false; // TODO: Get from stats
+        const smokeFreeStreak = useStatsStore.getState().smokeFreeStreak;
         
         await loadAchievements();
-        await checkAndUnlockAchievements(currentStreak, moneySaved, crisesHandled, hasSlipped, profile);
+        await checkAndUnlockAchievements(currentStreak, moneySaved, crisesHandled, hasSlipped, profile, smokeFreeStreak);
         
         // Check time-based health achievements (20min, 12hours)
         if (profile.quitDate) {

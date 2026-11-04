@@ -162,8 +162,9 @@ export default function AchievementsScreen() {
             const cigarettesNotSmoked = profile ? currentStreak * profile.dailyCigaretteCount : 0;
             const moneySaved = profile ? Math.floor((cigarettesNotSmoked / profile.cigarettesPerPack) * profile.packPrice) : 0;
             const crisesHandled = crisisLogs.length;
+            const smokeFreeStreak = useStatsStore.getState().smokeFreeStreak;
             await loadAchievements();
-            await useAchievementStore.getState().checkAndUnlockAchievements(currentStreak, moneySaved, crisesHandled, false, profile);
+            await useAchievementStore.getState().checkAndUnlockAchievements(currentStreak, moneySaved, crisesHandled, false, profile, smokeFreeStreak);
             // Check time-based health achievements
             if (profile?.quitDate) {
               await useAchievementStore.getState().checkTimedHealthAchievements(profile.quitDate);
