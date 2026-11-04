@@ -9,7 +9,6 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   Modal,
-  Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect } from 'react';
@@ -19,6 +18,7 @@ import { useStatsStore } from '@/store/statsStore';
 import { Spacing, Typography, BorderRadius } from '@/constants';
 import { Ionicons } from '@expo/vector-icons';
 import { formatDateShort } from '@/utils/gradualHelpers';
+import { FreezeModal } from '@/components/FreezeModal';
 
 /**
  * Daily Logger Screen - For gradual reduction users
@@ -39,6 +39,8 @@ export default function DailyLoggerScreen() {
   const [cigaretteCount, setCigaretteCount] = useState('');
   const [showCelebration, setShowCelebration] = useState(false);
   const [previousDayCount, setPreviousDayCount] = useState(-1);
+  const [freezeModalVisible, setFreezeModalVisible] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
 
   const target = profile?.gradualCurrentTarget || 0;
   const countNum = parseInt(cigaretteCount, 10) || 0;
@@ -63,64 +65,19 @@ export default function DailyLoggerScreen() {
       const freezesRemaining = profile.streakFreezes - profile.streakFreezesUsed;
       
       if (freezesRemaining > 0) {
-        // Ask user if they want to use freeze
-        Alert.alert(
-          'Hedefi Aştın',
-          `Bugün ${count} sigara içtin, hedefin ${target} idi.\n\nStreak Freeze kullanarak disiplin günü streakini koruyabilirsin.\n\nKalan freeze: ${freezesRemaining}`,
-          [
-            {
-              text: 'Freeze Kullanma',
-              style: 'destructive',
-              onPress: async () => {
-                // Don't use freeze, reset streak
-                await updateDailyStats(targetDate, {
-                  cigarettesSmoked: count,
-                  smokeFree: count === 0,
-                  targetCigarettes: target,
-                  metGoal: false,
-                });
-                router.back();
-              },
-            },
-            {
-              text: 'Freeze Kullan',
-              onPress: async () => {
-                // Use freeze, keep streak
-                const success = useUserStore.getState().useStreakFreeze();
-                if (success) {
-                  await updateDailyStats(targetDate, {
-                    cigarettesSmoked: count,
-                    smokeFree: count === 0,
-                    targetCigarettes: target,
-                    metGoal: true, // Treat as goal met because freeze was used
-                  });
-                }
-                router.back();
-              },
-            },
-          ]
-        );
+        // Show custom freeze modal
+        setPendingCount(count);
+        setFreezeModalVisible(true);
         return;
       } else {
-        // No freeze available, warn and reset streak
-        Alert.alert(
-          'Hedefi Aştın',
-          `Bugün ${count} sigara içtin, hedefin ${target} idi.\n\nFreeze kalmadığı için disiplin günü sıfırlanacak. Takvim verilerin korunur.`,
-          [
-            {
-              text: 'Tamam',
-              onPress: async () => {
-                await updateDailyStats(targetDate, {
-                  cigarettesSmoked: count,
-                  smokeFree: count === 0,
-                  targetCigarettes: target,
-                  metGoal: false,
-                });
-                router.back();
-              },
-            },
-          ]
-        );
+        // No freeze available, reset streak
+        await updateDailyStats(targetDate, {
+          cigarettesSmoked: count,
+          smokeFree: count === 0,
+          targetCigarettes: target,
+          metGoal: false,
+        });
+        router.back();
         return;
       }
     }
@@ -144,6 +101,42 @@ export default function DailyLoggerScreen() {
     } else {
       router.back();
     }
+  };
+
+  const handleUseFreeze = async () => {
+    setFreezeModalVisible(false);
+    
+    // Use freeze and save with goal met
+    const success = useUserStore.getState().useStreakFreeze();
+    if (success) {
+      await updateDailyStats(targetDate, {
+        cigarettesSmoked: pendingCount,
+        smokeFree: pendingCount === 0,
+        targetCigarettes: target,
+        metGoal: true, // Treat as goal met because freeze was used
+      });
+    }
+    router.back();
+  };
+
+  const handleDeclineFreeze = async () => {
+    setFreezeModalVisible(false);
+    
+    // Don't use freeze, reset streak
+    await updateDailyStats(targetDate, {
+      cigarettesSmoked: pendingCount,
+      smokeFree: pendingCount === 0,
+      targetCigarettes: target,
+      metGoal: false,
+    });
+    router.back();
+  };
+
+  const handleCorrection = () => {
+    setFreezeModalVisible(false);
+    // Clear input so user can re-enter correct value
+    setCigaretteCount('');
+    setPendingCount(0);
   };
 
   const metGoal = countNum <= target;
@@ -263,6 +256,17 @@ export default function DailyLoggerScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Freeze Modal */}
+      <FreezeModal
+        visible={freezeModalVisible}
+        onUseFreeze={handleUseFreeze}
+        onDecline={handleDeclineFreeze}
+        onCorrection={handleCorrection}
+        cigaretteCount={pendingCount}
+        target={target}
+        freezesRemaining={(profile?.streakFreezes || 0) - (profile?.streakFreezesUsed || 0)}
+      />
     </>
   );
 }
