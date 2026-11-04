@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Image, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useUserStore } from '@/store/userStore';
@@ -26,6 +26,7 @@ export default function HomeScreen() {
   const { checkAndUnlockAchievements, checkTimedHealthAchievements, loadAchievements } = useAchievementStore();
   
   const [activeCard, setActiveCard] = useState(0);
+  const [showFreezeInfo, setShowFreezeInfo] = useState(false);
   
   // Check if quit date is in the future or today
   const quitDate = profile?.quitDate ? new Date(profile.quitDate) : null;
@@ -45,6 +46,9 @@ export default function HomeScreen() {
   const daysUntilQuit = quitDateNormalized && quitDateNormalized > today
     ? Math.ceil((quitDateNormalized.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
     : 0;
+  
+  // Calculate freezes remaining
+  const freezesRemaining = (profile?.streakFreezes || 0) - (profile?.streakFreezesUsed || 0);
   
   // Animation values
   const mascotScale = useRef(new Animated.Value(1)).current;
@@ -231,27 +235,40 @@ export default function HomeScreen() {
       >
         {/* Mascot & Message */}
         <View style={styles.header}>
-          <Animated.View 
-            style={[
-              styles.avatarPlaceholder,
-              { 
-                backgroundColor: 'transparent',
-                transform: [{ scale: mascotScale }] 
-              }
-            ]}
+          <View style={styles.headerLeft}>
+            <Animated.View 
+              style={[
+                styles.avatarPlaceholder,
+                { 
+                  backgroundColor: 'transparent',
+                  transform: [{ scale: mascotScale }] 
+                }
+              ]}
+            >
+              <Image 
+                source={require('../../../assets/smoof.png')}
+                style={styles.smoofImage}
+                resizeMode="contain"
+              />
+            </Animated.View>
+            <Text style={[styles.greeting, { color: colors.text }]}>
+              Sözünü Aldım! 🤝
+            </Text>
+            <Text style={[styles.subGreeting, { color: colors.textSecondary }]}>
+              {quitDate?.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })} günü sigarayı bırakıyoruz
+            </Text>
+          </View>
+          
+          {/* Freeze badge - sağ üst */}
+          <TouchableOpacity
+            style={[styles.freezeBadge, { backgroundColor: colors.accent + '20' }]}
+            onPress={() => setShowFreezeInfo(true)}
           >
-            <Image 
-              source={require('../../../assets/smoof.png')}
-              style={styles.smoofImage}
-              resizeMode="contain"
-            />
-          </Animated.View>
-          <Text style={[styles.greeting, { color: colors.text }]}>
-            Sözünü Aldım! 🤝
-          </Text>
-          <Text style={[styles.subGreeting, { color: colors.textSecondary }]}>
-            {quitDate?.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })} günü sigarayı bırakıyoruz
-          </Text>
+            <Ionicons name="snow" size={16} color={colors.accent} />
+            <Text style={[styles.freezeCount, { color: colors.accent }]}>
+              {freezesRemaining}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Countdown Card */}
@@ -270,6 +287,40 @@ export default function HomeScreen() {
             <Text style={styles.streakDays}>GÜN</Text>
           </View>
         </LinearGradient>
+
+        {/* Freeze Info Modal */}
+        <Modal
+          visible={showFreezeInfo}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowFreezeInfo(false)}
+        >
+          <TouchableOpacity 
+            style={styles.infoOverlay}
+            activeOpacity={1}
+            onPress={() => setShowFreezeInfo(false)}
+          >
+            <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
+              <View style={[styles.infoHeader, { backgroundColor: colors.accent + '20' }]}>
+                <Ionicons name="snow" size={32} color={colors.accent} />
+                <Text style={[styles.infoTitle, { color: colors.text }]}>
+                  Streak Freeze
+                </Text>
+              </View>
+              <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                {profile?.quitMethod === 'gradual'
+                  ? 'Hedefini aştığın günlerde freeze kullanarak disiplin günü streak\'ini koruyabilirsin.'
+                  : 'Kayma anında freeze kullanarak sigarasız günlerini koruyabilirsin.'
+                }
+              </Text>
+              <View style={styles.infoStats}>
+                <Text style={[styles.infoStatsText, { color: colors.text }]}>
+                  Kalan: {freezesRemaining} / {profile?.streakFreezes || 0}
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </Modal>
 
         {/* Motivational Messages */}
         <View style={styles.preparationSection}>
@@ -396,28 +447,75 @@ export default function HomeScreen() {
       >
         {/* Mascot & Greeting */}
         <View style={styles.header}>
-          <Animated.View 
-            style={[
-              styles.avatarPlaceholder,
-              { 
-                backgroundColor: 'transparent',
-                transform: [{ scale: mascotScale }] 
-              }
-            ]}
+          <View style={styles.headerLeft}>
+            <Animated.View 
+              style={[
+                styles.avatarPlaceholder,
+                { 
+                  backgroundColor: 'transparent',
+                  transform: [{ scale: mascotScale }] 
+                }
+              ]}
+            >
+              <Image 
+                source={require('../../../assets/smoof.png')}
+                style={styles.smoofImage}
+                resizeMode="contain"
+              />
+            </Animated.View>
+            <Text style={[styles.greeting, { color: colors.text }]}>
+              Bugün Büyük Gün! 🚀
+            </Text>
+            <Text style={[styles.subGreeting, { color: colors.textSecondary }]}>
+              İlk günün başlıyor, heyecanlı mısın?
+            </Text>
+          </View>
+          
+          {/* Freeze badge - sağ üst */}
+          <TouchableOpacity
+            style={[styles.freezeBadge, { backgroundColor: colors.accent + '20' }]}
+            onPress={() => setShowFreezeInfo(true)}
           >
-            <Image 
-              source={require('../../../assets/smoof.png')}
-              style={styles.smoofImage}
-              resizeMode="contain"
-            />
-          </Animated.View>
-          <Text style={[styles.greeting, { color: colors.text }]}>
-            Bugün Büyük Gün! 🚀
-          </Text>
-          <Text style={[styles.subGreeting, { color: colors.textSecondary }]}>
-            İlk günün başlıyor, heyecanlı mısın?
-          </Text>
+            <Ionicons name="snow" size={16} color={colors.accent} />
+            <Text style={[styles.freezeCount, { color: colors.accent }]}>
+              {freezesRemaining}
+            </Text>
+          </TouchableOpacity>
         </View>
+        
+        {/* Freeze Info Modal */}
+        <Modal
+          visible={showFreezeInfo}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowFreezeInfo(false)}
+        >
+          <TouchableOpacity 
+            style={styles.infoOverlay}
+            activeOpacity={1}
+            onPress={() => setShowFreezeInfo(false)}
+          >
+            <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
+              <View style={[styles.infoHeader, { backgroundColor: colors.accent + '20' }]}>
+                <Ionicons name="snow" size={32} color={colors.accent} />
+                <Text style={[styles.infoTitle, { color: colors.text }]}>
+                  Streak Freeze
+                </Text>
+              </View>
+              <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                {profile?.quitMethod === 'gradual'
+                  ? 'Hedefini aştığın günlerde freeze kullanarak disiplin günü streak\'ini koruyabilirsin.'
+                  : 'Kayma anında freeze kullanarak sigarasız günlerini koruyabilirsin.'
+                }
+              </Text>
+              <View style={styles.infoStats}>
+                <Text style={[styles.infoStatsText, { color: colors.text }]}>
+                  Kalan: {freezesRemaining} / {profile?.streakFreezes || 0}
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </Modal>
 
         {/* First Day Card */}
         <LinearGradient
@@ -523,28 +621,75 @@ export default function HomeScreen() {
       >
         {/* Mascot & Greeting */}
         <View style={styles.header}>
-          <Animated.View 
-            style={[
-              styles.avatarPlaceholder,
-              { 
-                backgroundColor: 'transparent',
-                transform: [{ scale: mascotScale }] 
-              }
-            ]}
+          <View style={styles.headerLeft}>
+            <Animated.View 
+              style={[
+                styles.avatarPlaceholder,
+                { 
+                  backgroundColor: 'transparent',
+                  transform: [{ scale: mascotScale }] 
+                }
+              ]}
+            >
+              <Image 
+                source={require('../../../assets/smoof.png')}
+                style={styles.smoofImage}
+                resizeMode="contain"
+              />
+            </Animated.View>
+            <Text style={[styles.greeting, { color: colors.text }]}>
+              Merhaba! Bugün nasılsın?
+            </Text>
+            <Text style={[styles.subGreeting, { color: colors.textSecondary }]}>
+              {currentStreak > 0 ? `${currentStreak} gün disiplinli! 💪` : 'Başlamaya hazır mısın? 🚀'}
+            </Text>
+          </View>
+          
+          {/* Freeze badge - sağ üst */}
+          <TouchableOpacity
+            style={[styles.freezeBadge, { backgroundColor: colors.accent + '20' }]}
+            onPress={() => setShowFreezeInfo(true)}
           >
-            <Image 
-              source={require('../../../assets/smoof.png')}
-              style={styles.smoofImage}
-              resizeMode="contain"
-            />
-          </Animated.View>
-          <Text style={[styles.greeting, { color: colors.text }]}>
-            Merhaba! Bugün nasılsın?
-          </Text>
-          <Text style={[styles.subGreeting, { color: colors.textSecondary }]}>
-            {currentStreak > 0 ? `${currentStreak} gün disiplinli! 💪` : 'Başlamaya hazır mısın? 🚀'}
-          </Text>
+            <Ionicons name="snow" size={16} color={colors.accent} />
+            <Text style={[styles.freezeCount, { color: colors.accent }]}>
+              {freezesRemaining}
+            </Text>
+          </TouchableOpacity>
         </View>
+        
+        {/* Freeze Info Modal */}
+        <Modal
+          visible={showFreezeInfo}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowFreezeInfo(false)}
+        >
+          <TouchableOpacity 
+            style={styles.infoOverlay}
+            activeOpacity={1}
+            onPress={() => setShowFreezeInfo(false)}
+          >
+            <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
+              <View style={[styles.infoHeader, { backgroundColor: colors.accent + '20' }]}>
+                <Ionicons name="snow" size={32} color={colors.accent} />
+                <Text style={[styles.infoTitle, { color: colors.text }]}>
+                  Streak Freeze
+                </Text>
+              </View>
+              <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                {profile?.quitMethod === 'gradual'
+                  ? 'Hedefini aştığın günlerde freeze kullanarak disiplin günü streak\'ini koruyabilirsin.'
+                  : 'Kayma anında freeze kullanarak sigarasız günlerini koruyabilirsin.'
+                }
+              </Text>
+              <View style={styles.infoStats}>
+                <Text style={[styles.infoStatsText, { color: colors.text }]}>
+                  Kalan: {freezesRemaining} / {profile?.streakFreezes || 0}
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </Modal>
 
         {/* Discipline Streak Card */}
         <Animated.View 
@@ -656,33 +801,6 @@ export default function HomeScreen() {
             </View>
           </View>
         )}
-
-        {/* Freeze Info Card */}
-        <View style={[styles.freezeCard, { 
-          backgroundColor: colors.card,
-          borderColor: colors.cardBorder,
-        }]}>
-          <View style={styles.freezeHeader}>
-            <Ionicons name="snow" size={24} color={colors.accent} />
-            <Text style={[styles.freezeTitle, { color: colors.text }]}>
-              Streak Freeze
-            </Text>
-            <TouchableOpacity 
-              onPress={() => {
-                Alert.alert(
-                  'Streak Freeze Nedir?',
-                  'Hedef aşıldığında kullanılır. Disiplin günü streakini korur ve sıfırlanmasını engeller.',
-                  [{ text: 'Tamam' }]
-                );
-              }}
-            >
-              <Ionicons name="information-circle-outline" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-          <Text style={[styles.freezeCount, { color: colors.accent }]}>
-            {profile.streakFreezes - profile.streakFreezesUsed} / {profile.streakFreezes} kaldı
-          </Text>
-        </View>
 
         {/* Reduction Progress */}
         <View style={[styles.reductionCard, { 
@@ -835,28 +953,72 @@ export default function HomeScreen() {
     >
       {/* Mascot & Greeting */}
       <View style={styles.header}>
-        <Animated.View 
-          style={[
-            styles.avatarPlaceholder,
-            { 
-              backgroundColor: 'transparent',
-              transform: [{ scale: mascotScale }] 
-            }
-          ]}
+        <View style={styles.headerLeft}>
+          <Animated.View 
+            style={[
+              styles.avatarPlaceholder,
+              { 
+                backgroundColor: 'transparent',
+                transform: [{ scale: mascotScale }] 
+              }
+            ]}
+          >
+            <Image 
+              source={require('../../../assets/smoof.png')}
+              style={styles.smoofImage}
+              resizeMode="contain"
+            />
+          </Animated.View>
+          <Text style={[styles.greeting, { color: colors.text }]}>
+            Merhaba! Bugün nasılsın?
+          </Text>
+          <Text style={[styles.subGreeting, { color: colors.textSecondary }]}>
+            {getMotivationalMessage()}
+          </Text>
+        </View>
+        
+        {/* Freeze badge - sağ üst */}
+        <TouchableOpacity
+          style={[styles.freezeBadge, { backgroundColor: colors.accent + '20' }]}
+          onPress={() => setShowFreezeInfo(true)}
         >
-          <Image 
-            source={require('../../../assets/smoof.png')}
-            style={styles.smoofImage}
-            resizeMode="contain"
-          />
-        </Animated.View>
-        <Text style={[styles.greeting, { color: colors.text }]}>
-          Merhaba! Bugün nasılsın?
-        </Text>
-        <Text style={[styles.subGreeting, { color: colors.textSecondary }]}>
-          {getMotivationalMessage()}
-        </Text>
+          <Ionicons name="snow" size={16} color={colors.accent} />
+          <Text style={[styles.freezeCount, { color: colors.accent }]}>
+            {freezesRemaining}
+          </Text>
+        </TouchableOpacity>
       </View>
+      
+      {/* Freeze Info Modal */}
+      <Modal
+        visible={showFreezeInfo}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowFreezeInfo(false)}
+      >
+        <TouchableOpacity 
+          style={styles.infoOverlay}
+          activeOpacity={1}
+          onPress={() => setShowFreezeInfo(false)}
+        >
+          <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
+            <View style={[styles.infoHeader, { backgroundColor: colors.accent + '20' }]}>
+              <Ionicons name="snow" size={32} color={colors.accent} />
+              <Text style={[styles.infoTitle, { color: colors.text }]}>
+                Streak Freeze
+              </Text>
+            </View>
+            <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+              Kayma anında freeze kullanarak sigarasız günlerini koruyabilirsin.
+            </Text>
+            <View style={styles.infoStats}>
+              <Text style={[styles.infoStatsText, { color: colors.text }]}>
+                Kalan: {freezesRemaining} / {profile?.streakFreezes || 0}
+              </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Streak Counter - Hero Section */}
       <Animated.View 
@@ -965,35 +1127,6 @@ export default function HomeScreen() {
         </Animated.View>
       </TouchableOpacity>
 
-      {/* Freeze Info Card */}
-      {profile && (
-        <View style={[styles.freezeCard, { 
-          backgroundColor: colors.card,
-          borderColor: colors.cardBorder,
-        }]}>
-          <View style={styles.freezeHeader}>
-            <Ionicons name="snow" size={24} color={colors.accent} />
-            <Text style={[styles.freezeTitle, { color: colors.text }]}>
-              Streak Freeze
-            </Text>
-            <TouchableOpacity 
-              onPress={() => {
-                Alert.alert(
-                  'Streak Freeze Nedir?',
-                  'Bir gün sigara içersen, streak freeze kullanarak streakini koruyabilirsin. Freeze kullanmazsan streak sıfırlanır.',
-                  [{ text: 'Tamam' }]
-                );
-              }}
-            >
-              <Ionicons name="information-circle-outline" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-          <Text style={[styles.freezeCount, { color: colors.accent }]}>
-            {profile.streakFreezes - profile.streakFreezesUsed} / {profile.streakFreezes} kaldı
-          </Text>
-        </View>
-      )}
-
       {/* Quick Stats */}
       <View style={styles.quickStats}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
@@ -1038,8 +1171,14 @@ const styles = StyleSheet.create({
     paddingTop: Spacing['4xl'],
   },
   header: {
-    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: Spacing.xl,
+  },
+  headerLeft: {
+    flex: 1,
+    alignItems: 'center',
   },
   avatarPlaceholder: {
     width: 120,
@@ -1068,6 +1207,64 @@ const styles = StyleSheet.create({
   },
   subGreeting: {
     fontSize: Typography.sizes.sm,
+  },
+  freezeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginTop: 8,
+  },
+  freezeCount: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  infoOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  infoCard: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 16,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  infoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  infoTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  infoText: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  infoStats: {
+    padding: 12,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  infoStatsText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   streakCard: {
     padding: Spacing.xl,
@@ -1408,28 +1605,6 @@ const styles = StyleSheet.create({
   smokeFreeValue: {
     fontSize: Typography.sizes.xl,
     fontWeight: Typography.weights.bold,
-  },
-  freezeCard: {
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    marginBottom: Spacing.lg,
-    gap: Spacing.xs,
-  },
-  freezeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  freezeTitle: {
-    fontSize: Typography.sizes.base,
-    fontWeight: Typography.weights.semibold,
-    flex: 1,
-  },
-  freezeCount: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
-    marginLeft: Spacing.lg + Spacing.sm,
   },
   reductionCard: {
     padding: Spacing.lg,
