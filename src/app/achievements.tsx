@@ -61,6 +61,23 @@ export default function AchievementsScreen() {
         }
         // For no-slip achievements, use streak
         return currentStreak;
+      case 'gradual':
+        if (achievement.id.includes('week') || achievement.id.includes('month')) {
+          return currentStreak; // Discipline days
+        }
+        if (achievement.id === 'gradual_half' || achievement.id === 'gradual_75') {
+          // Reduction percentage
+          const startCount = profile?.gradualStartCount || profile?.dailyCigaretteCount || 0;
+          const currentTarget = profile?.gradualCurrentTarget || 0;
+          const reductionPercent = startCount > 0 
+            ? Math.floor(((startCount - currentTarget) / startCount) * 100)
+            : 0;
+          return reductionPercent;
+        }
+        if (achievement.id === 'gradual_zero') {
+          return profile?.gradualCurrentTarget === 0 ? 100 : 0;
+        }
+        return 0;
       default:
         return 0;
     }
@@ -146,7 +163,7 @@ export default function AchievementsScreen() {
             const moneySaved = profile ? Math.floor((cigarettesNotSmoked / profile.cigarettesPerPack) * profile.packPrice) : 0;
             const crisesHandled = crisisLogs.length;
             await loadAchievements();
-            await useAchievementStore.getState().checkAndUnlockAchievements(currentStreak, moneySaved, crisesHandled, false);
+            await useAchievementStore.getState().checkAndUnlockAchievements(currentStreak, moneySaved, crisesHandled, false, profile);
             // Check time-based health achievements
             if (profile?.quitDate) {
               await useAchievementStore.getState().checkTimedHealthAchievements(profile.quitDate);
@@ -286,6 +303,26 @@ export default function AchievementsScreen() {
             { color: filter === 'resistance' ? '#FFF' : colors.text }
           ]}>
             Direnç
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.filterTab,
+            filter === 'gradual' && styles.filterTabActive,
+            { 
+              backgroundColor: filter === 'gradual' ? colors.primary : colors.card,
+              borderColor: colors.cardBorder,
+            }
+          ]}
+          onPress={() => setFilter('gradual')}
+        >
+          <Ionicons name="trending-down" size={14} color={filter === 'gradual' ? '#FFF' : colors.text} />
+          <Text style={[
+            styles.filterTabText,
+            { color: filter === 'gradual' ? '#FFF' : colors.text }
+          ]}>
+            Kademeli
           </Text>
         </TouchableOpacity>
       </ScrollView>

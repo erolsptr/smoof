@@ -126,7 +126,7 @@ export default function HomeScreen() {
         const hasSlipped = false; // TODO: Get from stats
         
         await loadAchievements();
-        await checkAndUnlockAchievements(currentStreak, moneySaved, crisesHandled, hasSlipped);
+        await checkAndUnlockAchievements(currentStreak, moneySaved, crisesHandled, hasSlipped, profile);
         
         // Check time-based health achievements (20min, 12hours)
         if (profile.quitDate) {

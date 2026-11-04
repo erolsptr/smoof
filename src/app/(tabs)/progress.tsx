@@ -86,6 +86,41 @@ export default function ProgressScreen() {
           <Text style={[styles.statValue, { color: colors.text }]}>{lifeSavedDays}</Text>
           <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Gün Hayat</Text>
         </View>
+
+        {/* Gradual-specific stats */}
+        {profile.quitMethod === 'gradual' && (
+          <>
+            <View style={[styles.statBox, { backgroundColor: colors.card }]}>
+              <View style={[styles.statIconCircle, { backgroundColor: colors.success + '20' }]}>
+                <Ionicons name="flag" size={24} color={colors.success} />
+              </View>
+              <Text style={[styles.statValue, { color: colors.text }]}>
+                {profile.gradualStartCount || profile.dailyCigaretteCount}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Başlangıç</Text>
+            </View>
+
+            <View style={[styles.statBox, { backgroundColor: colors.card }]}>
+              <View style={[styles.statIconCircle, { backgroundColor: colors.primary + '20' }]}>
+                <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+              </View>
+              <Text style={[styles.statValue, { color: colors.text }]}>
+                {profile.gradualCurrentTarget || 0}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Şimdi</Text>
+            </View>
+
+            <View style={[styles.statBox, { backgroundColor: colors.card }]}>
+              <View style={[styles.statIconCircle, { backgroundColor: colors.accent + '20' }]}>
+                <Ionicons name="trending-down" size={24} color={colors.accent} />
+              </View>
+              <Text style={[styles.statValue, { color: colors.text }]}>
+                %{Math.floor(((profile.gradualStartCount || profile.dailyCigaretteCount) - (profile.gradualCurrentTarget || 0)) / (profile.gradualStartCount || profile.dailyCigaretteCount) * 100)}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Azalma</Text>
+            </View>
+          </>
+        )}
       </View>
 
       {/* Achievements CTA */}
