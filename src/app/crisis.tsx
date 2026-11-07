@@ -4,18 +4,19 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   Animated,
-  Dimensions,
   ScrollView,
   Image,
+  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useState, useEffect, useRef } from 'react';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useStatsStore } from '@/store/statsStore';
 import { useUserStore } from '@/store/userStore';
 import { Spacing, Typography, BorderRadius } from '@/constants';
+import { getTodayString } from '@/utils/dateHelpers';
 
-const { height } = Dimensions.get('window');
 
 /**
  * Crisis Mode Modal
@@ -27,6 +28,7 @@ export default function CrisisScreen() {
   const logCrisis = useStatsStore((state) => state.logCrisis);
   const currentStreak = useStatsStore((state) => state.currentStreak);
   const userProfile = useUserStore((state) => state.profile);
+  const insets = useSafeAreaInsets();
   
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes = 300 seconds
   const [isBreathing, setIsBreathing] = useState(false);
@@ -146,7 +148,7 @@ export default function CrisisScreen() {
     await useStatsStore.getState().recordSlip(1);
     
     // Reset streak by updating quit date to today
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayString();
     await useUserStore.getState().updateProfile({ quitDate: today });
     useStatsStore.getState().updateStreakFromQuitDate(today);
     
@@ -180,7 +182,7 @@ export default function CrisisScreen() {
   // Breathe animation scale - stronger animation
   const breathScale = breatheAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [1, 1.5], // Increased from 1.3 to 1.5 for more prominent animation
+    outputRange: [1, 1.4],
   });
   
   if (showResult) {
@@ -399,92 +401,97 @@ export default function CrisisScreen() {
   }
   
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.mainContainer, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleClose}>
+      <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? Spacing.sm : insets.top + Spacing.sm }]}>
+        <TouchableOpacity onPress={handleClose} hitSlop={12} accessibilityLabel="Kapat">
           <Text style={[styles.closeButton, { color: colors.textSecondary }]}>✕</Text>
         </TouchableOpacity>
       </View>
-      
-      {/* Mascot */}
-      <View style={styles.mascotContainer}>
-        {isBreathing ? (
-          <Animated.View style={{ 
-            transform: [{ scale: breathScale }],
-            alignItems: 'center',
-          }}>
-            <Image 
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Mascot - only the image scales, so the layout doesn't jump */}
+        <View style={styles.mascotContainer}>
+          <Animated.View style={{ transform: [{ scale: isBreathing ? breathScale : 1 }] }}>
+            <Image
               source={require('../../assets/smoof.png')}
               style={styles.mascotLarge}
               resizeMode="contain"
             />
-            {/* Breath phase indicator */}
-            <View style={[styles.breathPhaseIndicator, { 
-              backgroundColor: colors.accent + '20' 
-            }]}>
-              <Text style={styles.breathPhaseIcon}>
-                {breathPhase === 'inhale' ? '⬇️' : '⬆️'}
-              </Text>
-              <Text style={[styles.breathPhaseText, { color: colors.accent }]}>
-                {breathPhase === 'inhale' ? 'NEFES AL' : 'NEFES VER'}
-              </Text>
-            </View>
           </Animated.View>
-        ) : (
-          <Image 
-            source={require('../../assets/smoof.png')}
-            style={styles.mascotLarge}
-            resizeMode="contain"
-          />
+        </View>
+
+        {/* Breath phase indicator */}
+        {isBreathing && (
+          <View style={[styles.breathPhaseIndicator, { backgroundColor: colors.accent + '20' }]}>
+            <Text style={styles.breathPhaseIcon}>
+              {breathPhase === 'inhale' ? '⬇️' : '⬆️'}
+            </Text>
+            <Text style={[styles.breathPhaseText, { color: colors.accent }]}>
+              {breathPhase === 'inhale' ? 'NEFES AL' : 'NEFES VER'}
+            </Text>
+          </View>
         )}
-      </View>
-      
-      {/* Timer */}
-      <View style={[styles.timerCard, { backgroundColor: colors.card }]}>
-        <Text style={[styles.timerLabel, { color: colors.textSecondary }]}>
-          İstek geçene kadar:
-        </Text>
-        <Text style={[styles.timerValue, { color: colors.primary }]}>
-          {formatTime(timeLeft)}
-        </Text>
-      </View>
-      
-      {/* Motivation */}
-      <View style={[styles.motivationCard, { backgroundColor: colors.card }]}>
-        <Text style={[styles.motivationText, { color: colors.text }]}>
-          {motivationMessage}
-        </Text>
-      </View>
-      
-      {/* Breathing Exercise Button */}
-      <TouchableOpacity
+
+        {/* Timer */}
+        <View style={[styles.timerCard, { backgroundColor: colors.card }]}>
+          <Text style={[styles.timerLabel, { color: colors.textSecondary }]}>
+            İstek geçene kadar:
+          </Text>
+          <Text style={[styles.timerValue, { color: colors.primary }]}>
+            {formatTime(timeLeft)}
+          </Text>
+        </View>
+
+        {/* Motivation */}
+        <View style={[styles.motivationCard, { backgroundColor: colors.card }]}>
+          <Text style={[styles.motivationText, { color: colors.text }]}>
+            {motivationMessage}
+          </Text>
+        </View>
+
+        {/* Breathing Exercise Button */}
+        <TouchableOpacity
+          style={[
+            styles.breathButton,
+            {
+              backgroundColor: isBreathing ? colors.accent : colors.card,
+              borderColor: colors.accent,
+            },
+          ]}
+          onPress={() => setIsBreathing(!isBreathing)}
+        >
+          <Text style={[
+            styles.breathButtonText,
+            { color: isBreathing ? '#FFFFFF' : colors.accent }
+          ]}>
+            {isBreathing ? '🫁 Nefes Alıyorum...' : '🫁 Nefes Egzersizi Başlat'}
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      {/* Action Buttons - pinned to the bottom, always visible */}
+      <View
         style={[
-          styles.breathButton,
-          { 
-            backgroundColor: isBreathing ? colors.accent : colors.card,
-            borderColor: colors.accent,
+          styles.actions,
+          {
+            backgroundColor: colors.background,
+            borderTopColor: colors.cardBorder,
+            paddingBottom: Math.max(insets.bottom, Spacing.md),
           },
         ]}
-        onPress={() => setIsBreathing(!isBreathing)}
       >
-        <Text style={[
-          styles.breathButtonText,
-          { color: isBreathing ? '#FFFFFF' : colors.accent }
-        ]}>
-          {isBreathing ? '🫁 Nefes Alıyorum...' : '🫁 Nefes Egzersizi Başlat'}
-        </Text>
-      </TouchableOpacity>
-      
-      {/* Action Buttons */}
-      <View style={styles.actions}>
         <TouchableOpacity
           style={[styles.actionButton, { backgroundColor: colors.primary }]}
           onPress={handleResisted}
         >
           <Text style={styles.actionButtonText}>💪 Direndim</Text>
         </TouchableOpacity>
-        
+
         {!isGradualMode && (
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: colors.error, opacity: 0.7 }]}
@@ -493,15 +500,12 @@ export default function CrisisScreen() {
             <Text style={styles.actionButtonText}>😔 İçtim</Text>
           </TouchableOpacity>
         )}
+
+        {/* Helper text */}
+        <Text style={[styles.helperText, { color: colors.textSecondary }]}>
+          İstek genelde birkaç dakikada geçer. Atlattığında “Direndim”e bas 💪
+        </Text>
       </View>
-      
-      {/* Helper text */}
-      <Text style={[styles.helperText, { color: colors.textTertiary }]}>
-        {isGradualMode 
-          ? 'İsteğin geçene kadar diren. Sen yapabilirsin! 💪'
-          : '"Direndim" butonuna basmak için 5 dakika beklemelisin'
-        }
-      </Text>
     </View>
   );
 }
@@ -511,9 +515,18 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: Spacing['4xl'],
   },
+  mainContainer: {
+    flex: 1,
+  },
   header: {
     paddingHorizontal: Spacing.lg,
     alignItems: 'flex-end',
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: Spacing.lg,
   },
   closeButton: {
     fontSize: Typography.sizes['2xl'],
@@ -521,36 +534,40 @@ const styles = StyleSheet.create({
   },
   mascotContainer: {
     alignItems: 'center',
-    marginVertical: Spacing.xl,
+    justifyContent: 'center',
+    height: 200, // room for the 1.4x breathing scale
+    marginBottom: Spacing.md,
   },
   mascot: {
     width: 100,
     height: 100,
   },
   mascotLarge: {
-    width: 180, // Increased from 100 to 180
-    height: 180,
+    width: 140,
+    height: 140,
   },
   breathPhaseIndicator: {
-    marginTop: 24,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    marginBottom: Spacing.md,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
     borderRadius: 24,
     alignItems: 'center',
     gap: 8,
   },
   breathPhaseIcon: {
-    fontSize: 32,
+    fontSize: 22,
   },
   breathPhaseText: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: Typography.weights.bold,
     letterSpacing: 2,
   },
   timerCard: {
     marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.lg,
-    padding: Spacing.xl,
+    marginBottom: Spacing.md,
+    padding: Spacing.lg,
     borderRadius: BorderRadius.xl,
     alignItems: 'center',
   },
@@ -564,7 +581,7 @@ const styles = StyleSheet.create({
   },
   motivationCard: {
     marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
     padding: Spacing.lg,
     borderRadius: BorderRadius.lg,
   },
@@ -587,9 +604,9 @@ const styles = StyleSheet.create({
   },
   actions: {
     paddingHorizontal: Spacing.lg,
-    gap: Spacing.md,
-    marginTop: 'auto',
-    marginBottom: Spacing.lg,
+    paddingTop: Spacing.md,
+    gap: Spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   actionButton: {
     paddingVertical: Spacing.md,
@@ -604,8 +621,7 @@ const styles = StyleSheet.create({
   helperText: {
     fontSize: Typography.sizes.sm,
     textAlign: 'center',
-    marginBottom: Spacing.xl,
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.sm,
   },
   resultContent: {
     flex: 1,
