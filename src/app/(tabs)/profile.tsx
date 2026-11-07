@@ -4,7 +4,7 @@ import { useUserStore } from '@/store/userStore';
 import { useStatsStore } from '@/store/statsStore';
 import { useAchievementStore } from '@/store/achievementStore';
 import { storage } from '@/utils/storage';
-import { calculateStreakFromQuitDate, getTodayString } from '@/utils/dateHelpers';
+import { calculateStreakFromQuitDate, getDateString, getTodayString, parseDateKey } from '@/utils/dateHelpers';
 import { getCurrentGradualTarget } from '@/utils/gradualHelpers';
 import { Spacing, Typography, BorderRadius } from '@/constants';
 import { useRouter } from 'expo-router';
@@ -55,17 +55,28 @@ export default function ProfileScreen() {
     const today = new Date();
     const testDate = new Date(today);
     testDate.setDate(today.getDate() - daysAgo); // negative daysAgo means future
-    const newQuitDate = testDate.toISOString().split('T')[0];
+    const newQuitDate = getDateString(testDate);
 
-    await updateProfile({ quitDate: newQuitDate });
+    const isGradual = profile.quitMethod === 'gradual';
+
+    // Gradual mode: the calendar and weekly targets are based on gradualStartDate,
+    // so move it together with quitDate (otherwise past days stay locked)
+    await updateProfile(
+      isGradual
+        ? { quitDate: newQuitDate, gradualStartDate: newQuitDate }
+        : { quitDate: newQuitDate }
+    );
     updateStreakFromQuitDate(newQuitDate);
     
     const isPreparation = daysAgo < 0;
+    const planInfo = isGradual
+      ? `\nPlan: ${profile.gradualTargetWeeks ?? '-'} hafta, haftada -${profile.gradualWeeklyReduction ?? 0} sigara\nTakvimde ${newQuitDate} tarihinden itibaren giriş yapabilirsin`
+      : '';
     Alert.alert(
       'Tarih Güncellendi',
       isPreparation 
-        ? `Hazırlık Modu: ${Math.abs(daysAgo)} gün kaldı\nTarih: ${newQuitDate}`
-        : `Streak: ${daysAgo} gün\nTarih: ${newQuitDate}`
+        ? `Hazırlık Modu: ${Math.abs(daysAgo)} gün kaldı\nTarih: ${newQuitDate}${planInfo}`
+        : `Streak: ${daysAgo} gün\nTarih: ${newQuitDate}${planInfo}`
     );
   };
 
@@ -140,7 +151,7 @@ export default function ProfileScreen() {
   // Calculate stats
   const cigarettesNotSmoked = currentStreak * profile.dailyCigaretteCount;
   const moneySaved = Math.floor((cigarettesNotSmoked / 20) * profile.packPrice);
-  const quitDate = new Date(profile.quitDate);
+  const quitDate = parseDateKey(profile.quitDate);
   const formattedQuitDate = quitDate.toLocaleDateString('tr-TR', { 
     day: 'numeric', 
     month: 'long', 

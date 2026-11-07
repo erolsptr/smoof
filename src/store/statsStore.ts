@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { storage, STORAGE_KEYS } from '@/utils/storage';
-import { calculateStreakFromQuitDate } from '@/utils/dateHelpers';
+import { calculateStreakFromQuitDate, getTodayString } from '@/utils/dateHelpers';
 import type { DailyStats, CrisisLog } from '@/types';
 
 interface StatsState {
@@ -65,9 +65,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     // Recalculate streaks based on the updated data
     const calculateStreaks = () => {
       // Sort stats by date descending
-      const sorted = [...updatedStats].sort((a, b) => 
-        new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
+      const sorted = [...updatedStats].sort((a, b) => b.date.localeCompare(a.date));
       
       let disciplineStreak = 0;
       let smokeFreeStreak = 0;
@@ -112,7 +110,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   },
   
   recordSlip: async (cigarettesSmoked) => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayString();
     await get().updateDailyStats(today, {
       smokeFree: cigarettesSmoked === 0,
       cigarettesSmoked,
