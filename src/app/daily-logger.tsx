@@ -11,13 +11,15 @@ import {
   Modal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useUserStore } from '@/store/userStore';
 import { useStatsStore } from '@/store/statsStore';
 import { Spacing, Typography, BorderRadius } from '@/constants';
 import { Ionicons } from '@expo/vector-icons';
-import { formatDateShort } from '@/utils/gradualHelpers';
+import { formatDateShort, getGradualTargetForDate, getTrackingStartDate } from '@/utils/gradualHelpers';
+import { getTodayString } from '@/utils/dateHelpers';
 import { FreezeModal } from '@/components/FreezeModal';
 
 /**
@@ -27,12 +29,13 @@ import { FreezeModal } from '@/components/FreezeModal';
 export default function DailyLoggerScreen() {
   const { colors } = useColorScheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
   const profile = useUserStore((state) => state.profile);
   const { updateDailyStats, dailyStats } = useStatsStore();
   
   // Get target date from params or default to today
-  const today = new Date().toISOString().split('T')[0];
+  const today = getTodayString();
   const targetDate = (params.date as string) || today;
   const isToday = targetDate === today;
   
@@ -42,18 +45,15 @@ export default function DailyLoggerScreen() {
   const [freezeModalVisible, setFreezeModalVisible] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
 
-  const target = profile?.gradualCurrentTarget || 0;
+  // Target for the selected day (weekly auto-reduction applies to past days too)
+  const target = profile ? getGradualTargetForDate(profile, targetDate) : 0;
   const countNum = parseInt(cigaretteCount, 10) || 0;
   const isValid = cigaretteCount.length > 0 && countNum >= 0 && countNum <= 50;
 
-  // Check if target date is before quit date
-  const quitDate = new Date(profile?.quitDate || '');
-  quitDate.setHours(0, 0, 0, 0);
-  
-  const targetDateObj = new Date(targetDate);
-  targetDateObj.setHours(0, 0, 0, 0);
-  
-  const isBeforeQuitDate = targetDateObj < quitDate;
+  // Only days from the tracking start date up to today can be logged
+  const startDate = profile ? getTrackingStartDate(profile) : today;
+  const isBeforeQuitDate = targetDate < startDate;
+  const isFutureDate = targetDate > today;
 
   // Load target date's data if exists
   useEffect(() => {
@@ -65,7 +65,7 @@ export default function DailyLoggerScreen() {
   }, [dailyStats, targetDate]);
 
   // Show locked screen if date is before quit date
-  if (isBeforeQuitDate && profile) {
+  if ((isBeforeQuitDate || isFutureDate) && profile) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.lockedScreen}>
@@ -74,7 +74,9 @@ export default function DailyLoggerScreen() {
             Bu Gün Kilitli
           </Text>
           <Text style={[styles.lockedMessage, { color: colors.textSecondary }]}>
-            {formatDateShort(profile.quitDate)} tarihinden önce sigara girişi yapamazsın.
+            {isFutureDate
+              ? 'Gelecekteki günler için henüz giriş yapamazsın.'
+              : `${formatDateShort(startDate)} tarihinden önce sigara girişi yapamazsın.`}
           </Text>
           <TouchableOpacity 
             style={[styles.backButton, { backgroundColor: colors.primary }]}
@@ -182,8 +184,13 @@ export default function DailyLoggerScreen() {
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={styles.content}>
             {/* Header */}
-            <View style={styles.header}>
-              <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
+            <View style={[styles.header, { top: insets.top + Spacing.sm }]}>
+              <TouchableOpacity
+                onPress={() => router.back()}
+                style={styles.closeButton}
+                hitSlop={12}
+                accessibilityLabel="Kapat"
+              >
                 <Ionicons name="close" size={28} color={colors.text} />
               </TouchableOpacity>
             </View>
@@ -316,11 +323,14 @@ const styles = StyleSheet.create({
   },
   header: {
     position: 'absolute',
-    top: Spacing.lg,
-    right: Spacing.lg,
+    right: Spacing.md,
+    zIndex: 1,
   },
   closeButton: {
-    padding: Spacing.sm,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   questionSection: {
     alignItems: 'center',
