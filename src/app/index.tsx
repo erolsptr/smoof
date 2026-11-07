@@ -29,7 +29,7 @@ export default function IndexScreen() {
       // After loading, update streak from quit date
       const profile = useUserStore.getState().profile;
       if (profile) {
-        useStatsStore.getState().updateStreakFromQuitDate(profile.quitDate);
+        useStatsStore.getState().syncStreaks(profile);
       }
       
       setIsInitialized(true);

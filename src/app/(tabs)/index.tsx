@@ -1,55 +1,38 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Image, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { useUserStore } from '@/store/userStore';
 import { useStatsStore } from '@/store/statsStore';
-import { useAchievementStore } from '@/store/achievementStore';
-import { calculateStreakFromQuitDate } from '@/utils/dateHelpers';
-import { getCurrentGradualTarget } from '@/utils/gradualHelpers';
+import { useProgress } from '@/hooks/useProgress';
+import { addDays, daysBetween, getQuitTimestamp, getTodayString, parseDateKey, toDateKey } from '@/utils/dateHelpers';
+import { getCurrentGradualTarget, getGradualTargetForDate } from '@/utils/gradualHelpers';
 import { MonthCalendar, countUnloggedDays } from '@/components/MonthCalendar';
+import { CravingCard } from '@/components/CravingCard';
+import { FreezeBadge } from '@/components/FreezeBadge';
+import { HEALTH_MILESTONES, formatDuration, getNextHealthMilestone, getNextStreakMilestone } from '@/utils/milestones';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { calculateGradualCigarettesAvoided, calculateGradualMoneySaved } from '@/utils/gradualStatsCalculator';
-import { Spacing, Typography, BorderRadius } from '@/constants';
-import { useState, useEffect, useRef } from 'react';
+import { Spacing, Typography } from '@/constants';
+import { useEffect, useRef } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
 /**
  * Home Screen - Dashboard
- * Shows streak, stats carousel, and quick actions
+ * Preparation (future start), immediate quit (day 0 included) and gradual reduction
  */
 export default function HomeScreen() {
   const { colors } = useColorScheme();
   const router = useRouter();
-  const profile = useUserStore((state) => state.profile);
-  const currentStreak = useStatsStore((state) => state.currentStreak);
-  const crisisLogs = useStatsStore((state) => state.crisisLogs);
-  const dailyStats = useStatsStore((state) => state.dailyStats);
-  const smokeFreeStreak = useStatsStore((state) => state.smokeFreeStreak);
   const insets = useSafeAreaInsets();
-  const { checkAndUnlockAchievements, checkTimedHealthAchievements, loadAchievements } = useAchievementStore();
+  const { profile, now, immediate, gradual: gradualMetrics } = useProgress();
+  const currentStreak = useStatsStore((state) => state.currentStreak);
+  const smokeFreeStreak = useStatsStore((state) => state.smokeFreeStreak);
+  const dailyStats = useStatsStore((state) => state.dailyStats);
   
-  const [activeCard, setActiveCard] = useState(0);
-  const [showFreezeInfo, setShowFreezeInfo] = useState(false);
-  
-  // Check if quit date is in the future or today
-  const quitDate = profile?.quitDate ? new Date(profile.quitDate) : null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  // Quit date'i de günbaşına al
-  const quitDateNormalized = quitDate ? new Date(quitDate) : null;
-  if (quitDateNormalized) {
-    quitDateNormalized.setHours(0, 0, 0, 0);
-  }
-  
-  const isPreparationMode = quitDateNormalized ? quitDateNormalized > today : false;
-  const isFirstDay = quitDateNormalized ? quitDateNormalized.getTime() === today.getTime() : false;
-  
-  // Gün farkını doğru hesapla
-  const daysUntilQuit = quitDateNormalized && quitDateNormalized > today
-    ? Math.ceil((quitDateNormalized.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-    : 0;
+  // Quit / start day as local date keys
+  const quitDayKey = profile?.quitDate ? toDateKey(profile.quitDate) : null;
+  const todayKey = getTodayString();
+  const isPreparationMode = quitDayKey ? quitDayKey > todayKey : false;
+  const daysUntilQuit = isPreparationMode && quitDayKey ? daysBetween(todayKey, quitDayKey) : 0;
   
   // Calculate freezes remaining
   const freezesRemaining = (profile?.streakFreezes || 0) - (profile?.streakFreezesUsed || 0);
@@ -60,7 +43,6 @@ export default function HomeScreen() {
   const streakOpacity = useRef(new Animated.Value(0)).current;
   const cardsOpacity = useRef(new Animated.Value(0)).current;
   const cardsTranslateY = useRef(new Animated.Value(30)).current;
-  const crisisButtonScale = useRef(new Animated.Value(1)).current;
   
   // Entrance animations
   useEffect(() => {
@@ -116,80 +98,11 @@ export default function HomeScreen() {
     }
   }, [isPreparationMode]);
 
-  // Calculate real stats from profile and keep streak synced
-  useEffect(() => {
-    if (profile?.quitDate) {
-      const streakDays = calculateStreakFromQuitDate(profile.quitDate);
-      // Always ensure store has correct streak
-      if (currentStreak !== streakDays) {
-        useStatsStore.getState().updateStreakFromQuitDate(profile.quitDate);
-      }
-    }
-  }, [profile?.quitDate, currentStreak]);
-
-  // Check and unlock achievements
-  useEffect(() => {
-    const checkAchievements = async () => {
-      if (profile && currentStreak >= 0) {
-        const cigarettesNotSmoked = profile.quitMethod === 'gradual'
-          ? calculateGradualCigarettesAvoided(profile, dailyStats)
-          : currentStreak * profile.dailyCigaretteCount;
-        const moneySaved = profile.quitMethod === 'gradual'
-          ? calculateGradualMoneySaved(profile, cigarettesNotSmoked)
-          : Math.floor((cigarettesNotSmoked / profile.cigarettesPerPack) * profile.packPrice);
-        const crisesHandled = crisisLogs.length; // Use actual crisis count
-        const hasSlipped = false; // TODO: Get from stats
-        const smokeFreeStreak = useStatsStore.getState().smokeFreeStreak;
-        
-        await loadAchievements();
-        await checkAndUnlockAchievements(currentStreak, moneySaved, crisesHandled, hasSlipped, profile, smokeFreeStreak);
-        
-        // Check time-based health achievements (20min, 12hours)
-        if (profile.quitDate) {
-          await checkTimedHealthAchievements(profile.quitDate);
-        }
-      }
-    };
-    
-    checkAchievements();
-  }, [currentStreak, profile, crisisLogs.length, dailyStats.length]);
-
-  // Calculate real stats
-  const cigarettesNotSmoked = profile 
-    ? (profile.quitMethod === 'gradual'
-        ? calculateGradualCigarettesAvoided(profile, dailyStats)
-        : currentStreak * profile.dailyCigaretteCount)
-    : 0;
-    
-  const moneySaved = profile
-    ? (profile.quitMethod === 'gradual'
-        ? calculateGradualMoneySaved(profile, cigarettesNotSmoked)
-        : (cigarettesNotSmoked / profile.cigarettesPerPack) * profile.packPrice)
-    : 0;
-    
-  const timeSavedMinutes = cigarettesNotSmoked * 5; // 5 min per cigarette
+  // Numbers come from the shared metrics (same as Statistics / Profile / badges)
+  const cigarettesNotSmoked = immediate?.cigarettesAvoided ?? gradualMetrics?.cigarettesAvoided ?? 0;
+  const moneySaved = immediate?.moneySaved ?? gradualMetrics?.moneySaved ?? 0;
+  const timeSavedMinutes = immediate?.timeSavedMinutes ?? 0;
   const timeSavedHours = Math.floor(timeSavedMinutes / 60);
-
-  const stats = [
-    { 
-      label: 'İçilmeyen Sigara', 
-      value: cigarettesNotSmoked.toLocaleString('tr-TR'), 
-      iconName: 'close-circle' as const,
-      iconColor: '#EF4444',
-    },
-    { 
-      label: 'Para Tasarrufu', 
-      value: `₺${moneySaved.toFixed(0)}`, 
-      iconName: 'cash' as const,
-      iconColor: '#F59E0B',
-    },
-    { 
-      label: 'Kazanılan Zaman', 
-      value: `${timeSavedHours} saat`, 
-      iconName: 'time' as const,
-      iconColor: '#3B82F6',
-    },
-  ];
 
   // Motivational message based on streak
   const getMotivationalMessage = () => {
@@ -201,410 +114,170 @@ export default function HomeScreen() {
     return 'Efsanesin! Ne kadar güçlüsün 👑';
   };
 
-  // Preparation mode messages based on user's motivations
+  // Preparation message based on the user's motivations (rotates daily, no randomness in render)
   const getPreparationMessage = () => {
     const motivations = profile?.motivations || [];
-    const messages = [];
+    const messages: string[] = [];
 
-    if (motivations.includes('health')) {
-      messages.push('Sağlığın için harika bir karar verdin! ❤️');
-    }
-    if (motivations.includes('money')) {
-      messages.push('Tasarruf zamanı başlıyor! 💰');
-    }
-    if (motivations.includes('family')) {
-      messages.push('Sevdiklerin için bu adımı atıyorsun 👨‍👩‍👧‍👦');
-    }
-    if (motivations.includes('freedom')) {
-      messages.push('Bağımsızlık yakında senin olacak! 🦋');
-    }
-    if (motivations.includes('appearance')) {
-      messages.push('Cildin ve dişlerin teşekkür edecek! ✨');
-    }
-    if (motivations.includes('sports')) {
-      messages.push('Performansın artacak! 🏃‍♂️');
-    }
+    if (motivations.includes('health')) messages.push('Sağlığın için harika bir karar verdin! ❤️');
+    if (motivations.includes('money')) messages.push('Tasarruf zamanı başlıyor! 💰');
+    if (motivations.includes('family')) messages.push('Sevdiklerin için bu adımı atıyorsun 👨‍👩‍👧‍👦');
+    if (motivations.includes('freedom')) messages.push('Bağımsızlık yakında senin olacak! 🦋');
+    if (motivations.includes('appearance')) messages.push('Cildin ve dişlerin teşekkür edecek! ✨');
+    if (motivations.includes('sports')) messages.push('Performansın artacak! 🏃‍♂️');
 
-    return messages.length > 0 
-      ? messages[Math.floor(Math.random() * messages.length)]
-      : 'Harika bir karar verdin! 🌟';
+    if (messages.length === 0) return 'Harika bir karar verdin! 🌟';
+    return messages[new Date(now).getDate() % messages.length];
   };
 
-  // If in preparation mode, show countdown screen
-  if (isPreparationMode) {
+  const isGradual = profile?.quitMethod === 'gradual';
+
+  // Centered mascot + greeting; the freeze badge floats in the corner so it doesn't shift them
+  const renderCenteredHeader = (title: string, subtitle: string) => (
+    <View style={styles.centeredHeader}>
+      <FreezeBadge
+        remaining={freezesRemaining}
+        total={profile?.streakFreezes || 0}
+        description={isGradual
+          ? 'Hedefini aştığın günlerde freeze kullanarak disiplin günü streak’ini koruyabilirsin.'
+          : 'Kayma anında freeze kullanarak sigarasız günlerini koruyabilirsin.'}
+        style={styles.freezeBadgeCorner}
+      />
+      <Animated.View style={{ transform: [{ scale: mascotScale }] }}>
+        <Image
+          source={require('../../../assets/smoof.png')}
+          style={styles.centeredMascot}
+          resizeMode="contain"
+        />
+      </Animated.View>
+      <Text style={[styles.greeting, { color: colors.text }]}>{title}</Text>
+      <Text style={[styles.subGreeting, { color: colors.textSecondary }]}>{subtitle}</Text>
+    </View>
+  );
+
+  const renderListCard = (
+    icon: keyof typeof Ionicons.glyphMap,
+    iconColor: string,
+    title: string,
+    rows: { key: string; left?: string; text: string }[],
+  ) => (
+    <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+      <View style={styles.listHeader}>
+        <View style={[styles.listHeaderIcon, { backgroundColor: iconColor + '20' }]}>
+          <Ionicons name={icon} size={18} color={iconColor} />
+        </View>
+        <Text style={[styles.listTitle, { color: colors.text }]}>{title}</Text>
+      </View>
+      {rows.map((row) => (
+        <View key={row.key} style={styles.listRow}>
+          {row.left ? (
+            <Text style={[styles.listRowLeft, { color: iconColor }]}>{row.left}</Text>
+          ) : (
+            <Ionicons name="checkmark-circle-outline" size={18} color={iconColor} />
+          )}
+          <Text style={[styles.listRowText, { color: colors.textSecondary }]}>{row.text}</Text>
+        </View>
+      ))}
+    </View>
+  );
+
+  // ─────────────────────────────────────────────
+  // PREPARATION MODE - start date is in the future (both methods)
+  // ─────────────────────────────────────────────
+  if (isPreparationMode && profile && quitDayKey) {
+    const startLabel = parseDateKey(quitDayKey).toLocaleDateString('tr-TR', {
+      day: 'numeric',
+      month: 'long',
+      weekday: 'long',
+    });
+
+    const planRows = isGradual
+      ? Array.from({ length: Math.min(profile.gradualTargetWeeks || 6, 6) }).map((_, week) => {
+          const weekTarget = getGradualTargetForDate(profile, addDays(quitDayKey, week * 7));
+          return {
+            key: `w${week}`,
+            left: `${week + 1}. hafta`,
+            text: weekTarget === 0 ? 'Sigarasız! 🎉' : `Günde en fazla ${weekTarget} sigara`,
+          };
+        })
+      : [0, 1, 4, 5, 7].map((i) => HEALTH_MILESTONES[i]).map((m) => ({ key: m.label, left: m.label, text: m.title }));
+
+    const tips = isGradual
+      ? [
+          'Gün içinde kaç sigara içtiğini fark etmeye başla',
+          'En kolay vazgeçebileceğin sigarayı belirle',
+          'Sevdiklerine söyle, destek al',
+          'Stresli anlar için bir plan yap',
+        ]
+      : [
+          'Sigaralarını ve çakmağını şimdiden at',
+          'Sevdiklerine söyle, destek al',
+          'Stresli anlar için bir plan yap',
+          'Bol su iç, sağlıklı atıştırmalıklar al',
+        ];
+
     return (
-      <ScrollView 
+      <ScrollView
         style={[styles.container, { backgroundColor: colors.background }]}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.screenContent, { paddingTop: insets.top + 12 }]}
       >
-        {/* Mascot & Message */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Animated.View 
-              style={[
-                styles.avatarPlaceholder,
-                { 
-                  backgroundColor: 'transparent',
-                  transform: [{ scale: mascotScale }] 
-                }
-              ]}
-            >
-              <Image 
-                source={require('../../../assets/smoof.png')}
-                style={styles.smoofImage}
-                resizeMode="contain"
-              />
-            </Animated.View>
-            <Text style={[styles.greeting, { color: colors.text }]}>
-              Sözünü Aldım! 🤝
-            </Text>
-            <Text style={[styles.subGreeting, { color: colors.textSecondary }]}>
-              {quitDate?.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })} günü sigarayı bırakıyoruz
-            </Text>
-          </View>
-          
-          {/* Freeze badge - sağ üst */}
-          <TouchableOpacity
-            style={[styles.freezeBadge, { backgroundColor: colors.accent + '20' }]}
-            onPress={() => setShowFreezeInfo(true)}
+        {renderCenteredHeader('Sözünü aldım! 🤝', getPreparationMessage())}
+
+        <Animated.View style={{ opacity: streakOpacity, transform: [{ scale: streakScale }] }}>
+          <LinearGradient
+            colors={[colors.primary, colors.primaryDark]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.heroCard}
           >
-            <Ionicons name="snow" size={16} color={colors.accent} />
-            <Text style={[styles.freezeCount, { color: colors.accent }]}>
-              {freezesRemaining}
+            <View style={styles.heroTop}>
+              <View style={styles.heroIcon}>
+                <Ionicons name="calendar" size={26} color="#FFF" />
+              </View>
+              <View>
+                <Text style={styles.heroLabel}>BAŞLAMAYA KALAN</Text>
+                <View style={styles.heroValueRow}>
+                  <Text style={styles.heroNumber}>{daysUntilQuit}</Text>
+                  <Text style={styles.heroUnit}>gün</Text>
+                </View>
+              </View>
+            </View>
+            <View style={styles.heroDivider} />
+            <Text style={styles.heroProgressText}>
+              {isGradual ? 'Kademeli azaltma' : 'Sigarasız yolculuğun'} {startLabel} başlıyor
             </Text>
-          </TouchableOpacity>
-        </View>
+          </LinearGradient>
+        </Animated.View>
 
-        {/* Countdown Card */}
-        <LinearGradient
-          colors={[colors.primary, colors.primaryDark]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.streakCard}
-        >
-          <View style={styles.streakIconContainer}>
-            <Ionicons name="calendar" size={32} color="#FFF" />
-          </View>
-          <Text style={styles.streakLabel}>Başlamaya Kalan</Text>
-          <View style={styles.streakRow}>
-            <Text style={styles.streakNumber}>{daysUntilQuit}</Text>
-            <Text style={styles.streakDays}>GÜN</Text>
-          </View>
-        </LinearGradient>
-
-        {/* Freeze Info Modal */}
-        <Modal
-          visible={showFreezeInfo}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowFreezeInfo(false)}
-        >
-          <TouchableOpacity 
-            style={styles.infoOverlay}
-            activeOpacity={1}
-            onPress={() => setShowFreezeInfo(false)}
-          >
-            <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
-              <View style={[styles.infoHeader, { backgroundColor: colors.accent + '20' }]}>
-                <Ionicons name="snow" size={32} color={colors.accent} />
-                <Text style={[styles.infoTitle, { color: colors.text }]}>
-                  Streak Freeze
-                </Text>
-              </View>
-              <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-                Kayma anında freeze kullanarak sigarasız günlerini koruyabilirsin.
-              </Text>
-              <View style={styles.infoStats}>
-                <Text style={[styles.infoStatsText, { color: colors.text }]}>
-                  Kalan: {freezesRemaining} / {profile?.streakFreezes || 0}
-                </Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-        </Modal>
-
-        {/* Motivational Messages */}
-        <View style={styles.preparationSection}>
-          <View style={[styles.messageCard, { 
-            backgroundColor: colors.card,
-            borderColor: colors.cardBorder,
-          }]}>
-            <Ionicons name="heart" size={40} color="#FC8181" />
-            <Text style={[styles.messageTitle, { color: colors.text }]}>
-              O zamana kadar kafanı topla!
-            </Text>
-            <Text style={[styles.messageText, { color: colors.textSecondary }]}>
-              {getPreparationMessage()}
-            </Text>
-          </View>
-
-          {/* Tips for preparation */}
-          <View style={[styles.tipsCard, { 
-            backgroundColor: colors.card,
-            borderColor: colors.cardBorder,
-          }]}>
-            <View style={styles.tipHeader}>
-              <Ionicons name="bulb" size={24} color="#F59E0B" />
-              <Text style={[styles.tipsTitle, { color: colors.text }]}>
-                Hazırlık İpuçları
-              </Text>
-            </View>
-            
-            <View style={styles.tipsList}>
-              <View style={styles.tipItem}>
-                <View style={[styles.tipBullet, { backgroundColor: colors.primary }]} />
-                <Text style={[styles.tipText, { color: colors.textSecondary }]}>
-                  Sigaralarını ve çakmağını şimdiden at
-                </Text>
-              </View>
-              <View style={styles.tipItem}>
-                <View style={[styles.tipBullet, { backgroundColor: colors.primary }]} />
-                <Text style={[styles.tipText, { color: colors.textSecondary }]}>
-                  Sevdiklerine söyle, destek al
-                </Text>
-              </View>
-              <View style={styles.tipItem}>
-                <View style={[styles.tipBullet, { backgroundColor: colors.primary }]} />
-                <Text style={[styles.tipText, { color: colors.textSecondary }]}>
-                  Stresli durumlar için plan yap
-                </Text>
-              </View>
-              <View style={styles.tipItem}>
-                <View style={[styles.tipBullet, { backgroundColor: colors.primary }]} />
-                <Text style={[styles.tipText, { color: colors.textSecondary }]}>
-                  Bol bol su iç, sağlıklı atıştırmalıklar al
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* What will happen section */}
-          <View style={[styles.benefitsCard, { 
-            backgroundColor: colors.card,
-            borderColor: colors.cardBorder,
-          }]}>
-            <View style={styles.tipHeader}>
-              <Ionicons name="sparkles" size={24} color="#8B5CF6" />
-              <Text style={[styles.tipsTitle, { color: colors.text }]}>
-                Seni Neler Bekliyor
-              </Text>
-            </View>
-            
-            <View style={styles.benefitsList}>
-              <View style={styles.benefitItem}>
-                <View style={[styles.benefitIcon, { backgroundColor: '#EF4444' + '20' }]}>
-                  <Ionicons name="heart" size={20} color="#EF4444" />
-                </View>
-                <View style={styles.benefitContent}>
-                  <Text style={[styles.benefitTitle, { color: colors.text }]}>
-                    20 dakika sonra
-                  </Text>
-                  <Text style={[styles.benefitDesc, { color: colors.textSecondary }]}>
-                    Nabzın normale döner
-                  </Text>
-                </View>
-              </View>
-              
-              <View style={styles.benefitItem}>
-                <View style={[styles.benefitIcon, { backgroundColor: '#3B82F6' + '20' }]}>
-                  <Ionicons name="fitness" size={20} color="#3B82F6" />
-                </View>
-                <View style={styles.benefitContent}>
-                  <Text style={[styles.benefitTitle, { color: colors.text }]}>
-                    2 hafta sonra
-                  </Text>
-                  <Text style={[styles.benefitDesc, { color: colors.textSecondary }]}>
-                    Nefes almak kolaylaşır
-                  </Text>
-                </View>
-              </View>
-              
-              <View style={styles.benefitItem}>
-                <View style={[styles.benefitIcon, { backgroundColor: '#10B981' + '20' }]}>
-                  <Ionicons name="happy" size={20} color="#10B981" />
-                </View>
-                <View style={styles.benefitContent}>
-                  <Text style={[styles.benefitTitle, { color: colors.text }]}>
-                    1 ay sonra
-                  </Text>
-                  <Text style={[styles.benefitDesc, { color: colors.textSecondary }]}>
-                    Öksürük ve yorgunluk azalır
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
+        <Animated.View style={{ opacity: cardsOpacity, transform: [{ translateY: cardsTranslateY }] }}>
+          {renderListCard(
+            'sparkles',
+            colors.secondary,
+            isGradual ? `Planın · ${profile.gradualTargetWeeks || 6} hafta` : 'Seni neler bekliyor',
+            planRows,
+          )}
+          {renderListCard(
+            'bulb',
+            colors.primary,
+            'Hazırlık listesi',
+            tips.map((t) => ({ key: t, text: t })),
+          )}
+        </Animated.View>
       </ScrollView>
     );
   }
 
-  // If it's the first day (streak = 0), show special first day screen
-  // Gradual users skip this: they need the calendar to log from day one
-  if (isFirstDay && currentStreak === 0 && profile?.quitMethod !== 'gradual') {
-    return (
-      <ScrollView 
-        style={[styles.container, { backgroundColor: colors.background }]}
-        contentContainerStyle={styles.content}
-      >
-        {/* Mascot & Greeting */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Animated.View 
-              style={[
-                styles.avatarPlaceholder,
-                { 
-                  backgroundColor: 'transparent',
-                  transform: [{ scale: mascotScale }] 
-                }
-              ]}
-            >
-              <Image 
-                source={require('../../../assets/smoof.png')}
-                style={styles.smoofImage}
-                resizeMode="contain"
-              />
-            </Animated.View>
-            <Text style={[styles.greeting, { color: colors.text }]}>
-              Bugün Büyük Gün! 🚀
-            </Text>
-            <Text style={[styles.subGreeting, { color: colors.textSecondary }]}>
-              İlk günün başlıyor, heyecanlı mısın?
-            </Text>
-          </View>
-          
-          {/* Freeze badge - sağ üst */}
-          <TouchableOpacity
-            style={[styles.freezeBadge, { backgroundColor: colors.accent + '20' }]}
-            onPress={() => setShowFreezeInfo(true)}
-          >
-            <Ionicons name="snow" size={16} color={colors.accent} />
-            <Text style={[styles.freezeCount, { color: colors.accent }]}>
-              {freezesRemaining}
-            </Text>
-          </TouchableOpacity>
-        </View>
-        
-        {/* Freeze Info Modal */}
-        <Modal
-          visible={showFreezeInfo}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowFreezeInfo(false)}
-        >
-          <TouchableOpacity 
-            style={styles.infoOverlay}
-            activeOpacity={1}
-            onPress={() => setShowFreezeInfo(false)}
-          >
-            <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
-              <View style={[styles.infoHeader, { backgroundColor: colors.accent + '20' }]}>
-                <Ionicons name="snow" size={32} color={colors.accent} />
-                <Text style={[styles.infoTitle, { color: colors.text }]}>
-                  Streak Freeze
-                </Text>
-              </View>
-              <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-                Kayma anında freeze kullanarak sigarasız günlerini koruyabilirsin.
-              </Text>
-              <View style={styles.infoStats}>
-                <Text style={[styles.infoStatsText, { color: colors.text }]}>
-                  Kalan: {freezesRemaining} / {profile?.streakFreezes || 0}
-                </Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-        </Modal>
-
-        {/* First Day Card */}
-        <LinearGradient
-          colors={[colors.primary, colors.primaryDark]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.streakCard}
-        >
-          <View style={styles.streakIconContainer}>
-            <Ionicons name="rocket" size={32} color="#FFF" />
-          </View>
-          <Text style={styles.streakLabel}>İLK GÜNÜN</Text>
-          <Text style={styles.firstDayMessage}>
-            Bugün Sigara İçmeden Tamamla
-          </Text>
-          <Text style={styles.firstDaySubMessage}>
-            {"Streak'ini 1 yapacağız! 💪"}
-          </Text>
-        </LinearGradient>
-
-        {/* Motivation Card */}
-        <View style={[styles.messageCard, { 
-          backgroundColor: colors.card,
-          borderColor: colors.cardBorder,
-        }]}>
-          <Ionicons name="heart" size={40} color="#FC8181" />
-          <Text style={[styles.messageTitle, { color: colors.text }]}>
-            Sen Yaparsın!
-          </Text>
-          <Text style={[styles.messageText, { color: colors.textSecondary }]}>
-            Her büyük yolculuk ilk adımla başlar. Bugün o ilk adımı atıyorsun! İnanıyorum sana 🌟
-          </Text>
-        </View>
-
-        {/* First Day Tips */}
-        <View style={[styles.tipsCard, { 
-          backgroundColor: colors.card,
-          borderColor: colors.cardBorder,
-        }]}>
-          <View style={styles.tipHeader}>
-            <Ionicons name="shield-checkmark" size={24} color="#10B981" />
-            <Text style={[styles.tipsTitle, { color: colors.text }]}>
-              Bugün İçin İpuçları
-            </Text>
-          </View>
-          
-          <View style={styles.tipsList}>
-            <View style={styles.tipItem}>
-              <View style={[styles.tipBullet, { backgroundColor: colors.primary }]} />
-              <Text style={[styles.tipText, { color: colors.textSecondary }]}>
-                Sigara içme isteği geldiğinde kriz modunu kullan
-              </Text>
-            </View>
-            <View style={styles.tipItem}>
-              <View style={[styles.tipBullet, { backgroundColor: colors.primary }]} />
-              <Text style={[styles.tipText, { color: colors.textSecondary }]}>
-                Bol bol su iç, vücudun detoks oluyor
-              </Text>
-            </View>
-            <View style={styles.tipItem}>
-              <View style={[styles.tipBullet, { backgroundColor: colors.primary }]} />
-              <Text style={[styles.tipText, { color: colors.textSecondary }]}>
-                Günün sonunda kendini ödüllendir!
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Crisis Button */}
-        <TouchableOpacity
-          style={[styles.crisisButton, { backgroundColor: colors.error }]}
-          activeOpacity={0.8}
-          onPress={() => router.push('/crisis')}
-        >
-          <Ionicons name="alert-circle" size={24} color="#FFFFFF" />
-          <Text style={styles.crisisText}>Sigara İçmek İstiyorum</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    );
-  }
-
-  // GRADUAL MODE - Different UI for gradual reduction users
-  if (profile?.quitMethod === 'gradual') {
+  // ─────────────────────────────────────────────
+  // GRADUAL MODE
+  // ─────────────────────────────────────────────
+  if (profile && isGradual) {
     const target = getCurrentGradualTarget(profile);
     const unloggedDays = countUnloggedDays(profile, dailyStats);
 
     return (
       <ScrollView
         style={[styles.container, { backgroundColor: colors.background }]}
-        contentContainerStyle={[styles.gradualContent, { paddingTop: insets.top + 12 }]}
+        contentContainerStyle={[styles.screenContent, { paddingTop: insets.top + 12 }]}
       >
         {/* Header: mascot + greeting + freeze badge */}
         <View style={styles.gradualHeader}>
@@ -622,48 +295,12 @@ export default function HomeScreen() {
               <Text style={{ color: colors.text, fontWeight: '700' }}>{target} sigara</Text>
             </Text>
           </View>
-          <TouchableOpacity
-            style={[styles.freezeBadge, { backgroundColor: colors.accent + '20' }]}
-            onPress={() => setShowFreezeInfo(true)}
-            accessibilityLabel={`Kalan freeze: ${freezesRemaining}`}
-          >
-            <Ionicons name="snow" size={16} color={colors.accent} />
-            <Text style={[styles.freezeCount, { color: colors.accent }]}>
-              {freezesRemaining}
-            </Text>
-          </TouchableOpacity>
+          <FreezeBadge
+            remaining={freezesRemaining}
+            total={profile.streakFreezes || 0}
+            description="Hedefini aştığın günlerde freeze kullanarak disiplin günü streak’ini koruyabilirsin."
+          />
         </View>
-
-        {/* Freeze Info Modal */}
-        <Modal
-          visible={showFreezeInfo}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowFreezeInfo(false)}
-        >
-          <TouchableOpacity
-            style={styles.infoOverlay}
-            activeOpacity={1}
-            onPress={() => setShowFreezeInfo(false)}
-          >
-            <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
-              <View style={[styles.infoHeader, { backgroundColor: colors.accent + '20' }]}>
-                <Ionicons name="snow" size={32} color={colors.accent} />
-                <Text style={[styles.infoTitle, { color: colors.text }]}>
-                  Streak Freeze
-                </Text>
-              </View>
-              <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-                Hedefini aştığın günlerde freeze kullanarak disiplin günü streak'ini koruyabilirsin.
-              </Text>
-              <View style={styles.infoStats}>
-                <Text style={[styles.infoStatsText, { color: colors.text }]}>
-                  Kalan: {freezesRemaining} / {profile?.streakFreezes || 0}
-                </Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-        </Modal>
 
         {/* Streaks */}
         <View style={styles.gradualStreakRow}>
@@ -693,22 +330,7 @@ export default function HomeScreen() {
         </View>
 
         {/* Craving help - the place to tap when a craving hits */}
-        <TouchableOpacity
-          style={[styles.cravingCard, { backgroundColor: colors.accent }]}
-          onPress={() => router.push('/crisis')}
-          activeOpacity={0.85}
-          accessibilityRole="button"
-          accessibilityLabel="Canın sigara mı çekti? İsteği birlikte atlatalım"
-        >
-          <View style={styles.cravingIcon}>
-            <Ionicons name="hand-left" size={22} color={colors.accent} />
-          </View>
-          <View style={styles.cravingTextBox}>
-            <Text style={styles.cravingTitle}>Canın sigara mı çekti?</Text>
-            <Text style={styles.cravingSubtitle}>Dokun, isteği birlikte atlatalım</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={22} color="#FFF" />
-        </TouchableOpacity>
+        <CravingCard />
 
         {/* Calendar */}
         <View style={[styles.calendarCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
@@ -727,219 +349,180 @@ export default function HomeScreen() {
     );
   }
 
-  // IMMEDIATE MODE - Original UI for immediate quit users
-  return (
-    <ScrollView 
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.content}
-    >
-      {/* Mascot & Greeting */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Animated.View 
-            style={[
-              styles.avatarPlaceholder,
-              { 
-                backgroundColor: 'transparent',
-                transform: [{ scale: mascotScale }] 
-              }
-            ]}
-          >
-            <Image 
-              source={require('../../../assets/smoof.png')}
-              style={styles.smoofImage}
-              resizeMode="contain"
-            />
-          </Animated.View>
-          <Text style={[styles.greeting, { color: colors.text }]}>
-            Merhaba! Bugün nasılsın?
-          </Text>
-          <Text style={[styles.subGreeting, { color: colors.textSecondary }]}>
-            {getMotivationalMessage()}
-          </Text>
-        </View>
-        
-        {/* Freeze badge - sağ üst */}
-        <TouchableOpacity
-          style={[styles.freezeBadge, { backgroundColor: colors.accent + '20' }]}
-          onPress={() => setShowFreezeInfo(true)}
-        >
-          <Ionicons name="snow" size={16} color={colors.accent} />
-          <Text style={[styles.freezeCount, { color: colors.accent }]}>
-            {freezesRemaining}
-          </Text>
-        </TouchableOpacity>
-      </View>
-      
-      {/* Freeze Info Modal */}
-      <Modal
-        visible={showFreezeInfo}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowFreezeInfo(false)}
-      >
-        <TouchableOpacity 
-          style={styles.infoOverlay}
-          activeOpacity={1}
-          onPress={() => setShowFreezeInfo(false)}
-        >
-          <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
-            <View style={[styles.infoHeader, { backgroundColor: colors.accent + '20' }]}>
-              <Ionicons name="snow" size={32} color={colors.accent} />
-              <Text style={[styles.infoTitle, { color: colors.text }]}>
-                Streak Freeze
-              </Text>
-            </View>
-            <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-              Kayma anında freeze kullanarak sigarasız günlerini koruyabilirsin.
-            </Text>
-            <View style={styles.infoStats}>
-              <Text style={[styles.infoStatsText, { color: colors.text }]}>
-                Kalan: {freezesRemaining} / {profile?.streakFreezes || 0}
-              </Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+  // ─────────────────────────────────────────────
+  // IMMEDIATE MODE (day 0 = first day, same layout)
+  // ─────────────────────────────────────────────
+  const isDayZero = currentStreak === 0;
+  const streakMilestone = getNextStreakMilestone(currentStreak);
+  const quitTimestamp = profile?.quitDate ? getQuitTimestamp(profile.quitDate) : now;
+  const minutesSinceQuit = Math.max(0, (now - quitTimestamp) / 60000);
+  const healthMilestone = getNextHealthMilestone(minutesSinceQuit);
 
-      {/* Streak Counter - Hero Section */}
-      <Animated.View 
-        style={[
-          { 
-            opacity: streakOpacity,
-            transform: [{ scale: streakScale }]
-          }
-        ]}
-      >
+  // Day 0: the first badge comes at midnight, so show progress towards it
+  const midnight = parseDateKey(addDays(getTodayString(), 1)).getTime();
+  const dayZeroProgress = midnight > quitTimestamp
+    ? (now - quitTimestamp) / (midnight - quitTimestamp)
+    : 1;
+  const minutesToMidnight = (midnight - now) / 60000;
+
+  const heroProgress = isDayZero ? dayZeroProgress : streakMilestone.progress;
+  const heroProgressLabel = isDayZero
+    ? `Gece yarısına kadar dayan, ilk rozet senin · ${formatDuration(minutesToMidnight)} kaldı`
+    : `Sonraki rozet: ${streakMilestone.target} gün · ${streakMilestone.remaining} gün kaldı`;
+
+  const gains = [
+    {
+      key: 'cigarettes',
+      icon: 'ban' as const,
+      color: colors.error,
+      value: Math.floor(cigarettesNotSmoked).toLocaleString('tr-TR'),
+      label: 'İçilmeyen\nsigara',
+    },
+    {
+      key: 'money',
+      icon: 'wallet' as const,
+      color: colors.secondary,
+      value: `₺${Math.floor(moneySaved).toLocaleString('tr-TR')}`,
+      label: 'Cebinde\nkalan',
+    },
+    {
+      key: 'time',
+      icon: 'time' as const,
+      color: colors.accent,
+      value: timeSavedMinutes < 60 ? `${timeSavedMinutes} dk` : `${timeSavedHours} sa`,
+      label: 'Kazanılan\nzaman',
+    },
+  ];
+
+  return (
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={[styles.screenContent, { paddingTop: insets.top + 12 }]}
+    >
+      {isDayZero
+        ? renderCenteredHeader('Bugün büyük gün! 🚀', 'İlk günün başladı, yanındayım')
+        : renderCenteredHeader('Merhaba! Bugün nasılsın?', getMotivationalMessage())}
+
+      {/* Streak hero */}
+      <Animated.View style={{ opacity: streakOpacity, transform: [{ scale: streakScale }] }}>
         <LinearGradient
           colors={[colors.primary, colors.primaryDark]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.streakCard}
+          style={styles.heroCard}
         >
-          <View style={styles.streakIconContainer}>
-            <Ionicons name="flame" size={32} color="#FFF" />
+          <View style={styles.heroTop}>
+            <View style={styles.heroIcon}>
+              <Ionicons name={isDayZero ? 'rocket' : 'flame'} size={26} color="#FFF" />
+            </View>
+            <View>
+              <Text style={styles.heroLabel}>{isDayZero ? 'İLK GÜNÜN' : 'SİGARASIZ'}</Text>
+              <View style={styles.heroValueRow}>
+                <Text style={styles.heroNumber}>{currentStreak}</Text>
+                <Text style={styles.heroUnit}>gün</Text>
+              </View>
+            </View>
           </View>
-          <Text style={styles.streakLabel}>Sigarasız Streak</Text>
-          <View style={styles.streakRow}>
-            <Text style={styles.streakNumber}>{currentStreak}</Text>
-            <Text style={styles.streakDays}>GÜN</Text>
+
+          <View style={styles.heroProgressTrack}>
+            <View
+              style={[
+                styles.heroProgressFill,
+                { width: `${Math.min(100, Math.max(4, heroProgress * 100))}%` },
+              ]}
+            />
           </View>
+          <Text style={styles.heroProgressText}>{heroProgressLabel}</Text>
         </LinearGradient>
       </Animated.View>
 
-      {/* Stats Carousel */}
-      <Animated.View 
-        style={[
-          styles.carouselContainer,
-          {
-            opacity: cardsOpacity,
-            transform: [{ translateY: cardsTranslateY }]
-          }
-        ]}
-      >
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          pagingEnabled
-          contentContainerStyle={styles.carousel}
-          onMomentumScrollEnd={(e) => {
-            const index = Math.round(e.nativeEvent.contentOffset.x / 300);
-            setActiveCard(index);
-          }}
-        >
-          {stats.map((stat, index) => (
+      {/* Craving help */}
+      <CravingCard />
+
+      <Animated.View style={{ opacity: cardsOpacity, transform: [{ translateY: cardsTranslateY }] }}>
+        {/* Gains */}
+        <View style={styles.gainsRow}>
+          {gains.map((gain) => (
             <View
-              key={index}
-              style={[styles.statCard, { 
-                backgroundColor: colors.card,
-                borderColor: colors.cardBorder,
-              }]}
+              key={gain.key}
+              style={[styles.gainTile, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
             >
-              <View style={[styles.statIconCircle, { backgroundColor: stat.iconColor + '20' }]}>
-                <Ionicons name={stat.iconName} size={32} color={stat.iconColor} />
+              <View style={[styles.gainIcon, { backgroundColor: gain.color + '20' }]}>
+                <Ionicons name={gain.icon} size={18} color={gain.color} />
               </View>
-              <Text style={[styles.statValue, { color: colors.text }]}>
-                {stat.value}
+              <Text
+                style={[styles.gainValue, { color: colors.text }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.6}
+              >
+                {gain.value}
               </Text>
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-                {stat.label}
+              <Text style={[styles.gainLabel, { color: colors.textSecondary }]}>
+                {gain.label}
               </Text>
             </View>
           ))}
-        </ScrollView>
-        
-        {/* Carousel Indicators */}
-        <View style={styles.indicators}>
-          {stats.map((_, index) => (
-            <View
-              key={index}
-              style={[
-                styles.indicator,
-                {
-                  backgroundColor: index === activeCard ? colors.primary : colors.cardBorder,
-                },
-              ]}
-            />
-          ))}
         </View>
+
+        {/* Next health milestone */}
+        <TouchableOpacity
+          style={[styles.healthCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+          onPress={() => router.push('/achievements')}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.healthIcon, { backgroundColor: colors.error + '18' }]}>
+            <Ionicons name="heart" size={20} color={colors.error} />
+          </View>
+          <View style={styles.healthBody}>
+            {healthMilestone ? (
+              <>
+                <Text style={[styles.healthLabel, { color: colors.textSecondary }]}>
+                  Sıradaki sağlık kazanımı · {healthMilestone.reachedCount}/{HEALTH_MILESTONES.length}
+                </Text>
+                <Text style={[styles.healthTitle, { color: colors.text }]} numberOfLines={1}>
+                  {healthMilestone.title}
+                </Text>
+                <View style={[styles.healthTrack, { backgroundColor: colors.cardBorder }]}>
+                  <View
+                    style={[
+                      styles.healthFill,
+                      {
+                        backgroundColor: colors.error,
+                        width: `${Math.min(100, Math.max(3, healthMilestone.progress * 100))}%`,
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={[styles.healthLeft, { color: colors.textSecondary }]}>
+                  {formatDuration(healthMilestone.minutesLeft)} kaldı
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={[styles.healthLabel, { color: colors.textSecondary }]}>
+                  Sağlık kazanımları · {HEALTH_MILESTONES.length}/{HEALTH_MILESTONES.length}
+                </Text>
+                <Text style={[styles.healthTitle, { color: colors.text }]}>
+                  Hepsini tamamladın! 🎉
+                </Text>
+              </>
+            )}
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+        </TouchableOpacity>
+
+        {/* First-day tips */}
+        {isDayZero && (
+          <View style={styles.dayZeroTips}>
+            {renderListCard('shield-checkmark', colors.primary, 'Bugün için ipuçları', [
+              { key: 't1', text: 'İstek gelince “Canın sigara mı çekti?” kartına dokun' },
+              { key: 't2', text: 'Bol bol su iç, vücudun toksinlerden arınıyor' },
+              { key: 't3', text: 'Günün sonunda kendini küçük bir şeyle ödüllendir' },
+            ])}
+          </View>
+        )}
       </Animated.View>
-
-      {/* Crisis Button */}
-      <TouchableOpacity
-        style={[styles.crisisButton, { backgroundColor: colors.error }]}
-        activeOpacity={0.8}
-        onPress={() => router.push('/crisis')}
-        onPressIn={() => {
-          Animated.spring(crisisButtonScale, {
-            toValue: 0.95,
-            useNativeDriver: true,
-          }).start();
-        }}
-        onPressOut={() => {
-          Animated.spring(crisisButtonScale, {
-            toValue: 1,
-            useNativeDriver: true,
-          }).start();
-        }}
-      >
-        <Animated.View style={[styles.crisisButtonContent, { transform: [{ scale: crisisButtonScale }] }]}>
-          <Ionicons name="alert-circle" size={24} color="#FFFFFF" />
-          <Text style={styles.crisisText}>Sigara İçmek İstiyorum</Text>
-        </Animated.View>
-      </TouchableOpacity>
-
-      {/* Quick Stats */}
-      <View style={styles.quickStats}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          Kazanımların
-        </Text>
-        <View style={[styles.quickCard, { 
-          backgroundColor: colors.card,
-          borderColor: colors.cardBorder,
-        }]}>
-          <View style={styles.quickItem}>
-            <View style={[styles.quickIconCircle, { backgroundColor: colors.accent + '20' }]}>
-              <Ionicons name="time-outline" size={20} color={colors.accent} />
-            </View>
-            <Text style={[styles.quickText, { color: colors.textSecondary }]}>
-              Tasarruf edilen zaman: <Text style={[styles.quickValue, { color: colors.text }]}>
-                {timeSavedHours} saat
-              </Text>
-            </Text>
-          </View>
-          <View style={styles.quickItem}>
-            <View style={[styles.quickIconCircle, { backgroundColor: colors.error + '20' }]}>
-              <Ionicons name="heart" size={20} color={colors.error} />
-            </View>
-            <Text style={[styles.quickText, { color: colors.textSecondary }]}>
-              Kalp sağlığı: <Text style={[styles.quickValue, { color: colors.success }]}>
-                {currentStreak > 0 ? 'İyileşiyor' : 'Başlamaya hazır'}
-              </Text>
-            </Text>
-          </View>
-        </View>
-      </View>
     </ScrollView>
   );
 }
@@ -948,363 +531,222 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  content: {
-    padding: Spacing.lg,
-    paddingTop: Spacing['4xl'],
+  screenContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 32,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: Spacing.xl,
-  },
-  headerLeft: {
-    flex: 1,
+
+  // Shared header
+  centeredHeader: {
     alignItems: 'center',
+    marginBottom: 20,
   },
-  avatarPlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
+  freezeBadgeCorner: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    zIndex: 1,
   },
-  smoofImage: {
-    width: 110,
-    height: 110,
-  },
-  avatarEmoji: {
-    fontSize: 40,
+  centeredMascot: {
+    width: 96,
+    height: 96,
+    marginBottom: 8,
   },
   greeting: {
     fontSize: Typography.sizes.xl,
     fontWeight: Typography.weights.semibold,
     marginBottom: Spacing.xs,
+    textAlign: 'center',
   },
   subGreeting: {
     fontSize: Typography.sizes.sm,
+    textAlign: 'center',
   },
-  freezeBadge: {
+
+  // Hero card (immediate + preparation)
+  heroCard: {
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+  },
+  heroTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
+    gap: 14,
+    marginBottom: 16,
+  },
+  heroIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroLabel: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+  },
+  heroValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+  },
+  heroNumber: {
+    color: '#FFF',
+    fontSize: 44,
+    fontWeight: '800',
+    lineHeight: 50,
+  },
+  heroUnit: {
+    color: '#FFF',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  heroDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  heroProgressTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    overflow: 'hidden',
+  },
+  heroProgressFill: {
+    height: '100%',
+    borderRadius: 4,
+    backgroundColor: '#FFF',
+  },
+  heroProgressText: {
+    color: 'rgba(255,255,255,0.95)',
+    fontSize: 13,
+    fontWeight: '600',
     marginTop: 8,
   },
-  freezeCount: {
-    fontSize: 14,
-    fontWeight: 'bold',
+
+  // Gains row
+  gainsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
   },
-  infoOverlay: {
+  gainTile: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
-  },
-  infoCard: {
-    width: '100%',
-    maxWidth: 400,
+    paddingVertical: 14,
+    paddingHorizontal: 6,
     borderRadius: 16,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
+    borderWidth: 1,
   },
-  infoHeader: {
+  gainIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  gainValue: {
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  gainLabel: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 2,
+    lineHeight: 16,
+  },
+
+  // Health milestone card
+  healthCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  healthIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  healthBody: {
+    flex: 1,
+  },
+  healthLabel: {
+    fontSize: 12,
+  },
+  healthTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  healthTrack: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  healthFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  healthLeft: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  dayZeroTips: {
+    marginTop: 16,
+  },
+
+  // List card (tips, plan, what to expect)
+  listCard: {
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
+    borderWidth: 1,
     marginBottom: 16,
+    gap: 10,
   },
-  infoTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  infoText: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  infoStats: {
-    padding: 12,
-    backgroundColor: 'rgba(0,0,0,0.05)',
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  infoStatsText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  streakCard: {
-    padding: Spacing.xl,
-    borderRadius: BorderRadius.xl,
-    alignItems: 'center',
-    marginBottom: Spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  streakIconContainer: {
-    marginBottom: Spacing.sm,
-  },
-  streakLabel: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.medium,
-    marginBottom: Spacing.md,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  streakRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: Spacing.sm,
-  },
-  streakNumber: {
-    color: '#FFFFFF',
-    fontSize: 72,
-    fontWeight: Typography.weights.extrabold,
-    lineHeight: 72,
-  },
-  streakDays: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
-  },
-  firstDayMessage: {
-    color: '#FFFFFF',
-    fontSize: Typography.sizes.xl,
-    fontWeight: Typography.weights.bold,
-    textAlign: 'center',
-    marginTop: Spacing.md,
-  },
-  firstDaySubMessage: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: Typography.sizes.base,
-    textAlign: 'center',
-    marginTop: Spacing.xs,
-  },
-  carouselContainer: {
-    marginBottom: Spacing.lg,
-  },
-  carousel: {
-    gap: Spacing.md,
-    paddingHorizontal: 4,
-  },
-  statCard: {
-    width: 280,
-    padding: Spacing.xl,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  statIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.md,
-  },
-  statValue: {
-    fontSize: Typography.sizes['3xl'],
-    fontWeight: Typography.weights.bold,
-    marginBottom: Spacing.xs,
-  },
-  statLabel: {
-    fontSize: Typography.sizes.base,
-  },
-  indicators: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    marginTop: Spacing.md,
-  },
-  indicator: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  crisisButton: {
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
-    alignItems: 'center',
-    marginBottom: Spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  crisisButtonContent: {
+  listHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  crisisText: {
-    color: '#FFFFFF',
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
-  },
-  quickStats: {
-    gap: Spacing.md,
-  },
-  sectionTitle: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: Typography.weights.bold,
-  },
-  quickCard: {
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    gap: Spacing.md,
-  },
-  quickItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  quickIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  quickText: {
-    fontSize: Typography.sizes.base,
-    flex: 1,
-  },
-  quickValue: {
-    fontWeight: Typography.weights.semibold,
-  },
-  preparationSection: {
-    gap: Spacing.lg,
-  },
-  messageCard: {
-    padding: Spacing.xl,
-    borderRadius: BorderRadius.xl,
-    borderWidth: 1,
-    alignItems: 'center',
-    gap: Spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  messageTitle: {
-    fontSize: Typography.sizes['2xl'],
-    fontWeight: Typography.weights.bold,
-    textAlign: 'center',
-  },
-  messageText: {
-    fontSize: Typography.sizes.base,
-    textAlign: 'center',
-    lineHeight: Typography.sizes.base * 1.5,
-  },
-  tipsCard: {
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    gap: Spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  tipHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing.xs,
-  },
-  tipsTitle: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
-  },
-  tipsList: {
-    gap: Spacing.md,
-  },
-  tipItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.sm,
-  },
-  tipBullet: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginTop: 7,
-  },
-  tipText: {
-    fontSize: Typography.sizes.base,
-    flex: 1,
-    lineHeight: Typography.sizes.base * 1.5,
-  },
-  benefitsCard: {
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    gap: Spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  benefitsList: {
-    gap: Spacing.md,
-  },
-  benefitItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  benefitIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  benefitContent: {
-    flex: 1,
-  },
-  benefitTitle: {
-    fontSize: Typography.sizes.base,
-    fontWeight: Typography.weights.semibold,
+    gap: 10,
     marginBottom: 2,
   },
-  benefitDesc: {
-    fontSize: Typography.sizes.sm,
+  listHeaderIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  // Gradual mode styles
-  gradualContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 32,
+  listTitle: {
+    fontSize: 16,
+    fontWeight: '700',
   },
+  listRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  listRowLeft: {
+    width: 72,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  listRowText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+
+  // Gradual mode
   gradualHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1363,41 +805,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     opacity: 0.8,
-  },
-  cravingCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  cravingIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cravingTextBox: {
-    flex: 1,
-  },
-  cravingTitle: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  cravingSubtitle: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 13,
-    marginTop: 2,
   },
   calendarCard: {
     padding: 12,

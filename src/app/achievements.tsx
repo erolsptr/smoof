@@ -2,8 +2,9 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useAchievementStore } from '@/store/achievementStore';
-import { useUserStore } from '@/store/userStore';
-import { useStatsStore } from '@/store/statsStore';
+import { useProgress } from '@/hooks/useProgress';
+import { ACHIEVEMENTS } from '@/constants/achievements';
+import { getAchievementProgress, isAchievementAvailable } from '@/utils/progressMetrics';
 import { Spacing, Typography, BorderRadius } from '@/constants';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
@@ -13,30 +14,19 @@ import type { Achievement } from '@/types';
 export default function AchievementsScreen() {
   const { colors } = useColorScheme();
   const router = useRouter();
-  const profile = useUserStore((state) => state.profile);
-  const currentStreak = useStatsStore((state) => state.currentStreak);
-  const crisisLogs = useStatsStore((state) => state.crisisLogs);
-  const { getUnlockedAchievements, getLockedAchievements, getProgressForAchievement, loadAchievements } = useAchievementStore();
+  const { achievementContext, isGradual } = useProgress();
+  const { unlockedAchievements: unlockedIds, loadAchievements } = useAchievementStore();
   
   const [filter, setFilter] = useState<'all' | Achievement['category']>('all');
   
   useEffect(() => {
-    const loadData = async () => {
-      await Promise.all([
-        loadAchievements(),
-        useStatsStore.getState().loadStatsData(),
-      ]);
-    };
-    loadData();
-  }, []);
+    loadAchievements();
+  }, [loadAchievements]);
 
-  const unlockedAchievements = getUnlockedAchievements();
-  const lockedAchievements = getLockedAchievements();
-  
-  // Calculate current values for progress
-  const cigarettesNotSmoked = profile ? currentStreak * profile.dailyCigaretteCount : 0;
-  const moneySaved = profile ? Math.floor((cigarettesNotSmoked / profile.cigarettesPerPack) * profile.packPrice) : 0;
-  const crisesHandled = crisisLogs.length;
+  // Gradual-only badges are hidden for immediate quitters (they can never earn them)
+  const available = ACHIEVEMENTS.filter((a) => isAchievementAvailable(a, isGradual));
+  const unlockedAchievements = available.filter((a) => unlockedIds.includes(a.id));
+  const lockedAchievements = available.filter((a) => !unlockedIds.includes(a.id));
   
   // Filter achievements
   const filteredUnlocked = filter === 'all' 
@@ -47,44 +37,8 @@ export default function AchievementsScreen() {
     ? lockedAchievements
     : lockedAchievements.filter(a => a.category === filter);
 
-  const getCurrentValue = (achievement: Achievement) => {
-    switch (achievement.category) {
-      case 'streak':
-      case 'health':
-        return currentStreak;
-      case 'savings':
-        return moneySaved;
-      case 'resistance':
-        // For crisis achievements, use crisis count
-        if (achievement.id.startsWith('crisis_')) {
-          return crisesHandled;
-        }
-        // For no-slip achievements, use streak
-        return currentStreak;
-      case 'gradual':
-        if (achievement.id.includes('week') || achievement.id.includes('month')) {
-          return currentStreak; // Discipline days
-        }
-        if (achievement.id === 'gradual_half' || achievement.id === 'gradual_75') {
-          // Reduction percentage
-          const startCount = profile?.gradualStartCount || profile?.dailyCigaretteCount || 0;
-          const currentTarget = profile?.gradualCurrentTarget || 0;
-          const reductionPercent = startCount > 0 
-            ? Math.floor(((startCount - currentTarget) / startCount) * 100)
-            : 0;
-          return reductionPercent;
-        }
-        if (achievement.id === 'gradual_zero') {
-          return profile?.gradualCurrentTarget === 0 ? 100 : 0;
-        }
-        return 0;
-      default:
-        return 0;
-    }
-  };
-
   const renderAchievement = (achievement: Achievement, unlocked: boolean) => {
-    const progress = getProgressForAchievement(achievement, getCurrentValue(achievement));
+    const progress = unlocked || !achievementContext ? 100 : getAchievementProgress(achievement, achievementContext);
     
     return (
       <View
@@ -159,16 +113,9 @@ export default function AchievementsScreen() {
         <TouchableOpacity 
           onPress={async () => {
             // Force check achievements
-            const cigarettesNotSmoked = profile ? currentStreak * profile.dailyCigaretteCount : 0;
-            const moneySaved = profile ? Math.floor((cigarettesNotSmoked / profile.cigarettesPerPack) * profile.packPrice) : 0;
-            const crisesHandled = crisisLogs.length;
-            const smokeFreeStreak = useStatsStore.getState().smokeFreeStreak;
+            if (!achievementContext) return;
             await loadAchievements();
-            await useAchievementStore.getState().checkAndUnlockAchievements(currentStreak, moneySaved, crisesHandled, false, profile, smokeFreeStreak);
-            // Check time-based health achievements
-            if (profile?.quitDate) {
-              await useAchievementStore.getState().checkTimedHealthAchievements(profile.quitDate);
-            }
+            await useAchievementStore.getState().checkAndUnlockAchievements(achievementContext);
           }}
           style={styles.backButton}
         >
@@ -195,7 +142,7 @@ export default function AchievementsScreen() {
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
           <Text style={styles.statValue}>
-            %{Math.floor((unlockedAchievements.length / (unlockedAchievements.length + lockedAchievements.length)) * 100)}
+            %{available.length ? Math.floor((unlockedAchievements.length / available.length) * 100) : 0}
           </Text>
           <Text style={styles.statLabel}>Tamamlama</Text>
         </View>
@@ -243,7 +190,7 @@ export default function AchievementsScreen() {
             styles.filterTabText,
             { color: filter === 'streak' ? '#FFF' : colors.text }
           ]}>
-            Streak
+            Sigarasız
           </Text>
         </TouchableOpacity>
 
@@ -307,6 +254,7 @@ export default function AchievementsScreen() {
           </Text>
         </TouchableOpacity>
 
+        {isGradual && (
         <TouchableOpacity
           style={[
             styles.filterTab,
@@ -326,6 +274,7 @@ export default function AchievementsScreen() {
             Kademeli
           </Text>
         </TouchableOpacity>
+        )}
       </ScrollView>
 
       {/* Achievements List */}

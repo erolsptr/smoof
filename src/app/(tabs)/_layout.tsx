@@ -1,9 +1,12 @@
 import { Tabs } from 'expo-router';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Ionicons } from '@expo/vector-icons';
+import { useProgressSync } from '@/hooks/useProgress';
 
 export default function TabsLayout() {
   const { colors } = useColorScheme();
+  // Keep streaks + badges in sync while the app is open
+  useProgressSync();
 
   return (
     <Tabs

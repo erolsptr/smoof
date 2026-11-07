@@ -1,19 +1,21 @@
 import { create } from 'zustand';
 import { storage, STORAGE_KEYS } from '@/utils/storage';
 import { calculateStreakFromQuitDate, getTodayString } from '@/utils/dateHelpers';
-import type { DailyStats, CrisisLog } from '@/types';
+import type { DailyStats, CrisisLog, UserProfile } from '@/types';
+import { computeGradualStreaks } from '@/utils/progressMetrics';
+import { useUserStore } from '@/store/userStore';
 
 interface StatsState {
   dailyStats: DailyStats[];
   crisisLogs: CrisisLog[];
   currentStreak: number; // For immediate: smoke-free days, For gradual: discipline days
   smokeFreeStreak: number; // Only counts days with 0 cigarettes (for gradual method)
-  longestStreak: number;
   
   // Actions
   logCrisis: (log: Omit<CrisisLog, 'id'>) => Promise<void>;
   updateDailyStats: (date: string, updates: Partial<DailyStats>) => Promise<void>;
-  updateStreakFromQuitDate: (quitDate: string) => void;
+  /** Recompute streaks for the profile's quit method (single source of truth) */
+  syncStreaks: (profile: UserProfile | null) => void;
   recordSlip: (cigarettesSmoked: number) => Promise<void>;
   loadStatsData: () => Promise<void>;
   clearStatsData: () => Promise<void>;
@@ -24,7 +26,6 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   crisisLogs: [],
   currentStreak: 0,
   smokeFreeStreak: 0,
-  longestStreak: 0,
   
   logCrisis: async (log) => {
     const newLog: CrisisLog = {
@@ -62,51 +63,19 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     set({ dailyStats: updatedStats });
     await storage.setItem(STORAGE_KEYS.DAILY_STATS, updatedStats);
     
-    // Recalculate streaks based on the updated data
-    const calculateStreaks = () => {
-      // Sort stats by date descending
-      const sorted = [...updatedStats].sort((a, b) => b.date.localeCompare(a.date));
-      
-      let disciplineStreak = 0;
-      let smokeFreeStreak = 0;
-      
-      // Calculate discipline streak (days meeting goal)
-      // For gradual mode: count consecutive days with metGoal: true from today backwards
-      for (const stat of sorted) {
-        if (stat.metGoal === true) {
-          disciplineStreak++;
-        } else if (stat.metGoal === false) {
-          // Explicitly false means they logged but didn't meet goal
-          break;
-        }
-        // If metGoal is undefined, it's an old entry - don't break, continue counting
-      }
-      
-      // Calculate smoke-free streak (0 cigarettes)
-      for (const stat of sorted) {
-        if (stat.smokeFree && stat.cigarettesSmoked === 0) {
-          smokeFreeStreak++;
-        } else {
-          break;
-        }
-      }
-      
-      set({ 
-        currentStreak: disciplineStreak,
-        smokeFreeStreak: smokeFreeStreak,
-        longestStreak: Math.max(get().longestStreak, disciplineStreak, smokeFreeStreak),
-      });
-    };
-    
-    calculateStreaks();
+    // Recalculate streaks from the updated data
+    get().syncStreaks(useUserStore.getState().profile);
   },
   
-  updateStreakFromQuitDate: (quitDate: string) => {
-    const streakDays = calculateStreakFromQuitDate(quitDate);
-    set({ 
-      currentStreak: streakDays,
-      longestStreak: Math.max(get().longestStreak, streakDays),
-    });
+  syncStreaks: (profile) => {
+    if (!profile) return;
+    if (profile.quitMethod === 'gradual') {
+      const { discipline, smokeFree } = computeGradualStreaks(profile, get().dailyStats);
+      set({ currentStreak: discipline, smokeFreeStreak: smokeFree });
+    } else {
+      const days = calculateStreakFromQuitDate(profile.quitDate);
+      set({ currentStreak: days, smokeFreeStreak: days });
+    }
   },
   
   recordSlip: async (cigarettesSmoked) => {
@@ -143,7 +112,6 @@ export const useStatsStore = create<StatsState>((set, get) => ({
       crisisLogs: [],
       currentStreak: 0,
       smokeFreeStreak: 0,
-      longestStreak: 0,
     });
   },
 }));

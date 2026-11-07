@@ -9,14 +9,28 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { useProgress } from '@/hooks/useProgress';
+import { formatDuration } from '@/utils/milestones';
+import { getPackCost } from '@/utils/progressMetrics';
 import { useRouter } from 'expo-router';
 import { useState, useEffect, useRef } from 'react';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useStatsStore } from '@/store/statsStore';
 import { useUserStore } from '@/store/userStore';
 import { Spacing, Typography, BorderRadius } from '@/constants';
-import { getTodayString } from '@/utils/dateHelpers';
 
+
+// Short, practical tip per trigger, shown after a slip
+const TRIGGER_TIPS: Record<string, string> = {
+  stress: 'Stres anında 1 dakikalık nefes egzersizi dene. “Canın sigara mı çekti?” kartı hep ana sayfada.',
+  social: 'Sosyal ortamlarda elinde bir içecek tutmak ve sigara içilen yerden uzak durmak işe yarar.',
+  coffee: 'Bir süre kahveyi farklı bir yerde ya da çayla içmeyi dene, alışkanlık bağını kırar.',
+  boredom: 'Canın sıkıldığında kısa bir yürüyüş, sakız ya da ellerini meşgul eden bir şey dene.',
+  habit: 'Hep sigara içtiğin anları fark et ve onların yerine yeni küçük bir ritüel koy.',
+  other: 'İsteği tetikleyen anı not al. Fark etmek, bir dahakine hazırlıklı olmanın ilk adımı.',
+};
 
 /**
  * Crisis Mode Modal
@@ -28,6 +42,7 @@ export default function CrisisScreen() {
   const logCrisis = useStatsStore((state) => state.logCrisis);
   const currentStreak = useStatsStore((state) => state.currentStreak);
   const userProfile = useUserStore((state) => state.profile);
+  const { immediate } = useProgress();
   const insets = useSafeAreaInsets();
   
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes = 300 seconds
@@ -113,6 +128,8 @@ export default function CrisisScreen() {
   const isGradualMode = userProfile?.quitMethod === 'gradual';
   
   const [usedFreeze, setUsedFreeze] = useState(false);
+  const [previousStreak, setPreviousStreak] = useState(0);
+  const [previousCigarettes, setPreviousCigarettes] = useState(0);
   
   const handleTriggerSelected = (trigger: string | null) => {
     setSelectedTrigger(trigger);
@@ -144,13 +161,16 @@ export default function CrisisScreen() {
       trigger: selectedTrigger || undefined,
     });
     
+    // Remember the streak before the reset, to show what the user keeps
+    setPreviousStreak(currentStreak);
+    setPreviousCigarettes(immediate?.cigarettesAvoided ?? 0);
+
     // Record slip (updates daily stats)
     await useStatsStore.getState().recordSlip(1);
     
-    // Reset streak by updating quit date to today
-    const today = getTodayString();
-    await useUserStore.getState().updateProfile({ quitDate: today });
-    useStatsStore.getState().updateStreakFromQuitDate(today);
+    // Reset: the new smoke-free period starts now (exact time, so health timers are right)
+    await useUserStore.getState().updateProfile({ quitDate: new Date().toISOString() });
+    useStatsStore.getState().syncStreaks(useUserStore.getState().profile);
     
     // Show result
     setUsedFreeze(false);
@@ -213,9 +233,10 @@ export default function CrisisScreen() {
     const streakFreezesRemaining = (userProfile?.streakFreezes || 0) - (userProfile?.streakFreezesUsed || 0);
     
     // Calculate achievements
-    const cigarettesNotSmoked = currentStreak * (userProfile?.dailyCigaretteCount || 0);
-    const moneySaved = Math.floor((cigarettesNotSmoked / 20) * (userProfile?.packPrice || 0));
-    const timeSavedHours = Math.floor((cigarettesNotSmoked * 5) / 60);
+    // Same numbers as Home / Statistics
+    const cigarettesNotSmoked = immediate?.cigarettesAvoided ?? 0;
+    const moneySaved = Math.floor(immediate?.moneySaved ?? 0);
+    const timeSavedLabel = formatDuration(immediate?.timeSavedMinutes ?? 0);
     
     if (slipStep === 'trigger') {
       const triggers = [
@@ -299,8 +320,7 @@ export default function CrisisScreen() {
               Sorun Değil
             </Text>
             <Text style={[styles.slipMessage, { color: colors.textSecondary }]}>
-              Bir adım geri atmış olabilirsin, ama <Text style={{ fontWeight: 'bold' }}>streak'in korunuyor</Text>.
-              Önemli olan devam etmen. Sen hala kazanıyorsun!
+              Bir sigara, şimdiye kadarki emeğini silmez. Önemli olan buradan nasıl devam ettiğin.
             </Text>
             
             {/* Achievements */}
@@ -309,13 +329,13 @@ export default function CrisisScreen() {
                 Unutma, sen şimdiye kadar:
               </Text>
               <Text style={[styles.achievementItem, { color: colors.textSecondary }]}>
-                🚭 {cigarettesNotSmoked} sigara içmedin
+                🚭 {cigarettesNotSmoked.toLocaleString('tr-TR')} sigara içmedin
               </Text>
               <Text style={[styles.achievementItem, { color: colors.textSecondary }]}>
-                💰 {moneySaved}₺ tasarruf ettin
+                💰 ₺{moneySaved.toLocaleString('tr-TR')} tasarruf ettin
               </Text>
               <Text style={[styles.achievementItem, { color: colors.textSecondary }]}>
-                ⏱️ {timeSavedHours} saat kazandın
+                ⏱️ {timeSavedLabel} kazandın
               </Text>
             </View>
             
@@ -362,41 +382,145 @@ export default function CrisisScreen() {
     }
     
     // Result Screen (slipStep === 'result')
+    const totalFreezes = userProfile?.streakFreezes || 0;
+    const triggerTip = selectedTrigger ? TRIGGER_TIPS[selectedTrigger] : null;
+    const prevCigarettes = previousCigarettes;
+    const prevMoney = userProfile ? Math.floor(getPackCost(userProfile, prevCigarettes)) : 0;
+
+    const renderTriggerTip = () =>
+      triggerTip ? (
+        <View style={[styles.resultCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+          <View style={styles.resultCardHeader}>
+            <Ionicons name="bulb" size={18} color={colors.secondary} />
+            <Text style={[styles.resultCardTitle, { color: colors.text }]}>Bir dahaki sefere</Text>
+          </View>
+          <Text style={[styles.resultCardText, { color: colors.textSecondary }]}>{triggerTip}</Text>
+        </View>
+      ) : null;
+
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.resultContent}>
-          <Image 
+      <ScrollView
+        style={[styles.resultScreen, { backgroundColor: colors.background }]}
+        contentContainerStyle={[
+          styles.resultScroll,
+          { paddingTop: Platform.OS === 'ios' ? Spacing.xl : insets.top + Spacing.xl, paddingBottom: insets.bottom + Spacing.lg },
+        ]}
+      >
+        {/* Mascot with status chip */}
+        <View style={styles.resultMascotWrap}>
+          <Image
             source={require('../../assets/smoof.png')}
-            style={styles.slipMascotImage}
+            style={styles.resultMascotImage}
             resizeMode="contain"
           />
-          <Text style={[styles.slipTitle, { color: colors.text }]}>
-            {usedFreeze ? 'Streak Korundu!' : 'Yeniden Başlıyoruz'}
-          </Text>
-          <Text style={[styles.slipMessage, { color: colors.textSecondary }]}>
-            {usedFreeze 
-              ? `Streak freeze kullandın! ${currentStreak} günlük streak'in korundu. Devam ediyoruz! 💚`
-              : 'Bugün yeni bir başlangıç. Geçmişe takılma, ileriye bak. Sen yapabilirsin! 🚀'
-            }
-          </Text>
-          
-          <View style={[styles.motivationCard, { backgroundColor: colors.card, marginTop: Spacing.xl }]}>
-            <Text style={[styles.motivationText, { color: colors.text }]}>
-              "Her gün yeni bir şans. Sen her zaman tekrar başlayabilirsin. Ben seninleyim!"
-            </Text>
-            <Text style={[styles.encouragementAuthor, { color: colors.textTertiary, marginTop: Spacing.sm }]}>
-              - Smoof 💚
-            </Text>
+          <View style={[styles.resultChip, { backgroundColor: usedFreeze ? colors.accent : colors.primary, borderColor: colors.background }]}>
+            <Ionicons name={usedFreeze ? 'snow' : 'refresh'} size={20} color="#FFF" />
           </View>
-          
-          <TouchableOpacity
-            style={[styles.continueButton, { backgroundColor: colors.primary, marginTop: Spacing.xl }]}
-            onPress={handleClose}
-          >
-            <Text style={styles.continueButtonText}>Ana Sayfaya Dön</Text>
-          </TouchableOpacity>
         </View>
-      </View>
+
+        <Text style={[styles.resultHeading, { color: colors.text }]}>
+          {usedFreeze ? 'Streak’in korundu!' : 'Yeniden başlıyoruz 💚'}
+        </Text>
+        <Text style={[styles.resultSub, { color: colors.textSecondary }]}>
+          {usedFreeze
+            ? 'Freeze kalkanın devreye girdi. Kaldığın yerden devam ediyorsun.'
+            : 'Kayma, yolculuğun sonu değil. Çoğu kişi bırakmayı birkaç denemede başarır.'}
+        </Text>
+
+        {usedFreeze ? (
+          <>
+            {/* Protected streak */}
+            <LinearGradient
+              colors={[colors.accent, colors.accentDark]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.resultHero}
+            >
+              <Text style={styles.resultHeroLabel}>SİGARASIZ</Text>
+              <View style={styles.resultHeroRow}>
+                <Text style={styles.resultHeroNumber}>{currentStreak}</Text>
+                <Text style={styles.resultHeroUnit}>gün</Text>
+              </View>
+              <View style={styles.resultHeroBadge}>
+                <Ionicons name="shield-checkmark" size={14} color="#FFF" />
+                <Text style={styles.resultHeroBadgeText}>Korundu</Text>
+              </View>
+            </LinearGradient>
+
+            {/* Remaining freezes */}
+            <View style={[styles.resultCard, styles.resultRowCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+              <Text style={[styles.resultCardTitle, { color: colors.text }]}>Kalan freeze</Text>
+              <View style={styles.freezeIcons}>
+                {Array.from({ length: totalFreezes }).map((_, i) => (
+                  <Ionicons
+                    key={i}
+                    name="snow"
+                    size={22}
+                    color={i < streakFreezesRemaining ? colors.accent : colors.cardBorder}
+                  />
+                ))}
+                <Text style={[styles.freezeIconsCount, { color: colors.textSecondary }]}>
+                  {streakFreezesRemaining}/{totalFreezes}
+                </Text>
+              </View>
+            </View>
+          </>
+        ) : (
+          <>
+            {/* What they keep */}
+            {(previousStreak > 0 || previousCigarettes > 0) && (
+              <View style={[styles.resultCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+                <View style={styles.resultCardHeader}>
+                  <Ionicons name="trophy" size={18} color={colors.streakFire} />
+                  <Text style={[styles.resultCardTitle, { color: colors.text }]}>Bu emek seninle kalıyor</Text>
+                </View>
+                <View style={styles.keptRow}>
+                  <View style={styles.keptItem}>
+                    <Text style={[styles.keptValue, { color: colors.text }]}>{previousStreak}</Text>
+                    <Text style={[styles.keptLabel, { color: colors.textSecondary }]}>gün{'\n'}sigarasız</Text>
+                  </View>
+                  <View style={styles.keptItem}>
+                    <Text style={[styles.keptValue, { color: colors.text }]}>{prevCigarettes.toLocaleString('tr-TR')}</Text>
+                    <Text style={[styles.keptLabel, { color: colors.textSecondary }]}>sigara{'\n'}içmedin</Text>
+                  </View>
+                  <View style={styles.keptItem}>
+                    <Text style={[styles.keptValue, { color: colors.text }]}>₺{prevMoney.toLocaleString('tr-TR')}</Text>
+                    <Text style={[styles.keptLabel, { color: colors.textSecondary }]}>cebinde{'\n'}kaldı</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* New start */}
+            <View style={[styles.resultCard, styles.resultRowCard, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '40' }]}>
+              <View style={[styles.newStartIcon, { backgroundColor: colors.primary }]}>
+                <Ionicons name="rocket" size={18} color="#FFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.resultCardTitle, { color: colors.text }]}>Yeni serin bugün başladı</Text>
+                <Text style={[styles.resultCardText, { color: colors.textSecondary }]}>
+                  Gece yarısına kadar dayan, ilk rozet senin
+                </Text>
+              </View>
+            </View>
+          </>
+        )}
+
+        {renderTriggerTip()}
+
+        <Text style={[styles.smoofQuote, { color: colors.textSecondary }]}>
+          “Her gün yeni bir şans. Ben seninleyim!” — Smoof
+        </Text>
+
+        <TouchableOpacity
+          style={[styles.continueButton, { backgroundColor: usedFreeze ? colors.accent : colors.primary }]}
+          onPress={handleClose}
+        >
+          <Text style={styles.continueButtonText}>
+            {usedFreeze ? 'Devam Et' : 'Ana Sayfaya Dön'}
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
     );
   }
   
@@ -762,8 +886,152 @@ const styles = StyleSheet.create({
   noFreezeText: {
     fontSize: Typography.sizes.sm,
   },
-  encouragementAuthor: {
-    fontSize: Typography.sizes.sm,
-    textAlign: 'center' as const,
+  // Slip result screens
+  resultScreen: {
+    flex: 1,
+  },
+  resultScroll: {
+    paddingHorizontal: Spacing.lg,
+  },
+  resultMascotWrap: {
+    alignSelf: 'center',
+    marginBottom: Spacing.md,
+  },
+  resultMascotImage: {
+    width: 110,
+    height: 110,
+  },
+  resultChip: {
+    position: 'absolute',
+    right: -4,
+    bottom: -4,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resultHeading: {
+    fontSize: Typography.sizes['2xl'],
+    fontWeight: Typography.weights.bold,
+    textAlign: 'center',
+    marginBottom: Spacing.sm,
+  },
+  resultSub: {
+    fontSize: Typography.sizes.base,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: Spacing.lg,
+    paddingHorizontal: Spacing.sm,
+  },
+  resultHero: {
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  resultHeroLabel: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+  },
+  resultHeroRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+  },
+  resultHeroNumber: {
+    color: '#FFF',
+    fontSize: 48,
+    fontWeight: '800',
+  },
+  resultHeroUnit: {
+    color: '#FFF',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  resultHeroBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+  },
+  resultHeroBadgeText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  resultCard: {
+    padding: Spacing.md,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+    gap: 8,
+  },
+  resultRowCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  resultCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  resultCardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  resultCardText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  freezeIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  freezeIconsCount: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  keptRow: {
+    flexDirection: 'row',
+    marginTop: 4,
+  },
+  keptItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  keptValue: {
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  keptLabel: {
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  newStartIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  smoofQuote: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginVertical: Spacing.md,
   },
 });

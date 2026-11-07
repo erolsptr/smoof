@@ -100,6 +100,14 @@ export function formatDate(dateString: string): string {
 }
 
 /**
+ * Quit moment in ms. A bare date key (YYYY-MM-DD, e.g. after a slip reset)
+ * means local midnight; a full ISO timestamp is used as-is.
+ */
+export function getQuitTimestamp(quitDate: string): number {
+  return DATE_KEY_RE.test(quitDate) ? parseDateKey(quitDate).getTime() : new Date(quitDate).getTime();
+}
+
+/**
  * Get time since quit for display (e.g., "42 gün 5 saat")
  */
 export function getTimeSinceQuit(quitDate: string): {
@@ -107,10 +115,7 @@ export function getTimeSinceQuit(quitDate: string): {
   hours: number;
   minutes: number;
 } {
-  const quit = new Date(quitDate);
-  const now = new Date();
-  
-  const diffMs = now.getTime() - quit.getTime();
+  const diffMs = Math.max(0, Date.now() - getQuitTimestamp(quitDate));
   
   const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));

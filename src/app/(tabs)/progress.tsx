@@ -1,224 +1,306 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import type { ReactNode } from 'react';
 import { useRouter } from 'expo-router';
-import { useColorScheme } from '@/hooks/useColorScheme';
-import { useUserStore } from '@/store/userStore';
-import { useStatsStore } from '@/store/statsStore';
-import { Spacing, Typography, BorderRadius } from '@/constants';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { calculateGradualCigarettesAvoided, calculateGradualMoneySaved } from '@/utils/gradualStatsCalculator';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { useProgress } from '@/hooks/useProgress';
+import { useAchievementStore } from '@/store/achievementStore';
+import { ACHIEVEMENTS } from '@/constants/achievements';
+import { isAchievementAvailable, MINUTES_PER_CIGARETTE } from '@/utils/progressMetrics';
+import { formatDuration } from '@/utils/milestones';
+import { daysBetween, getQuitTimestamp, getTodayString, parseDateKey, toDateKey } from '@/utils/dateHelpers';
+import { HealthTimeline } from '@/components/stats/HealthTimeline';
+import { WeekBarChart } from '@/components/stats/WeekBarChart';
+
+const TRIGGER_LABELS: Record<string, string> = {
+  stress: 'Stres',
+  social: 'Sosyal ortam',
+  coffee: 'Kahve',
+  boredom: 'Can sıkıntısı',
+  habit: 'Alışkanlık',
+  other: 'Diğer',
+};
+
+// Approximate per-cigarette yields (EU limits: 10 mg tar, 1 mg nicotine)
+const TAR_MG_PER_CIGARETTE = 10;
+const NICOTINE_MG_PER_CIGARETTE = 1;
+
+const formatMoney = (value: number) => `₺${Math.floor(value).toLocaleString('tr-TR')}`;
+const formatCount = (value: number) => Math.floor(value).toLocaleString('tr-TR');
+const formatDate = (key: string, withYear = false) =>
+  parseDateKey(key).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', ...(withYear ? { year: 'numeric' } : {}) });
+
+// ── Building blocks (module level so they keep state across re-renders) ──
+function Tile({ icon, color, value, label, sub }: {
+  icon: keyof typeof Ionicons.glyphMap; color: string; value: string; label: string; sub?: string;
+}) {
+  const { colors } = useColorScheme();
+  return (
+    <View style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+      <View style={[styles.tileIcon, { backgroundColor: color + '20' }]}>
+        <Ionicons name={icon} size={18} color={color} />
+      </View>
+      <Text style={[styles.tileValue, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+        {value}
+      </Text>
+      <Text style={[styles.tileLabel, { color: colors.textSecondary }]}>{label}</Text>
+      {sub ? <Text style={[styles.tileSub, { color: colors.textTertiary }]}>{sub}</Text> : null}
+    </View>
+  );
+}
+
+function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
+  const { colors } = useColorScheme();
+  return (
+    <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
+      {subtitle ? <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>{subtitle}</Text> : null}
+      <View style={styles.sectionBody}>{children}</View>
+    </View>
+  );
+}
+
+function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  const { colors } = useColorScheme();
+  return (
+    <View style={styles.row}>
+      <Text style={[styles.rowLabel, { color: colors.textSecondary }]}>{label}</Text>
+      <Text style={[styles.rowValue, { color: strong ? colors.primary : colors.text }]}>{value}</Text>
+    </View>
+  );
+}
 
 /**
- * Progress Screen - Shows statistics, health benefits, and achievements overview
+ * Statistics - different content for immediate quitters and gradual reducers,
+ * all numbers from the shared progress metrics.
  */
 export default function ProgressScreen() {
   const { colors } = useColorScheme();
   const router = useRouter();
-  const profile = useUserStore((state) => state.profile);
-  const currentStreak = useStatsStore((state) => state.currentStreak);
-  const dailyStats = useStatsStore((state) => state.dailyStats);
+  const insets = useSafeAreaInsets();
+  const { profile, immediate, gradual, cravings, isGradual, isPreparation } = useProgress();
+  const unlockedIds = useAchievementStore((s) => s.unlockedAchievements);
 
   if (!profile) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={[styles.title, { color: colors.text }]}>Veri yükleniyor...</Text>
+    return <View style={[styles.container, { backgroundColor: colors.background }]} />;
+  }
+
+  const availableBadges = ACHIEVEMENTS.filter((a) => isAchievementAvailable(a, isGradual));
+  const earnedBadges = availableBadges.filter((a) => unlockedIds.includes(a.id)).length;
+  const todayKey = getTodayString();
+  const startKey = isGradual && gradual ? gradual.startDate : toDateKey(profile.quitDate);
+  const daysToStart = isPreparation ? daysBetween(todayKey, startKey) : 0;
+
+  const cravingsSection = (
+    <Section title="İsteklerle mücadele" subtitle="“Canın sigara mı çekti?” kayıtların">
+      {cravings.resisted + cravings.slips === 0 ? (
+        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+          Henüz kayıt yok. Canın sigara çektiğinde ana sayfadaki karta dokun, burada görünsün.
+        </Text>
+      ) : (
+        <>
+          <Row label="Atlatılan istek" value={`${cravings.resisted}`} strong />
+          <Row label="Nefes egzersiziyle" value={`${cravings.breathingUsed}`} />
+          {!isGradual && <Row label="Kayma" value={`${cravings.slips}`} />}
+          {cravings.topTrigger && (
+            <Row label="En sık tetikleyici" value={TRIGGER_LABELS[cravings.topTrigger] ?? cravings.topTrigger} />
+          )}
+        </>
+      )}
+    </Section>
+  );
+
+  const badgesLink = (
+    <TouchableOpacity
+      style={[styles.badgesLink, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+      onPress={() => router.push('/achievements')}
+      activeOpacity={0.7}
+    >
+      <View style={[styles.tileIcon, { backgroundColor: colors.secondary + '20' }]}>
+        <Ionicons name="trophy" size={18} color={colors.secondary} />
       </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.badgesTitle, { color: colors.text }]}>Rozetler</Text>
+        <View style={[styles.track, { backgroundColor: colors.cardBorder }]}>
+          <View
+            style={[
+              styles.fill,
+              { backgroundColor: colors.secondary, width: `${Math.max(3, (earnedBadges / availableBadges.length) * 100)}%` },
+            ]}
+          />
+        </View>
+      </View>
+      <Text style={[styles.badgesCount, { color: colors.textSecondary }]}>
+        {earnedBadges}/{availableBadges.length}
+      </Text>
+      <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+    </TouchableOpacity>
+  );
+
+  // ── Header ─────────────────────────────────────
+  const header = (
+    <>
+      <Text style={[styles.title, { color: colors.text }]}>İstatistikler</Text>
+      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+        {isGradual ? 'Kademeli azaltma yolculuğun' : 'Sigarasız yolculuğun'}
+      </Text>
+    </>
+  );
+
+  // ── GRADUAL ────────────────────────────────────
+  if (isGradual && gradual) {
+    const weekProgress = Math.min(1, gradual.currentWeek / gradual.totalWeeks);
+    const planDone = gradual.todayTarget === 0;
+
+    return (
+      <ScrollView
+        style={[styles.container, { backgroundColor: colors.background }]}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
+      >
+        {header}
+
+        {/* Plan hero */}
+        <LinearGradient colors={[colors.primary, colors.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+          {isPreparation ? (
+            <>
+              <Text style={styles.heroLabel}>PLANIN BAŞLIYOR</Text>
+              <Text style={styles.heroValue}>{daysToStart} gün sonra</Text>
+              <Text style={styles.heroText}>{formatDate(startKey)} · {gradual.totalWeeks} haftalık plan</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.heroLabel}>PLAN İLERLEMESİ</Text>
+              <Text style={styles.heroValue}>
+                {planDone ? 'Hedef: 0 sigara 🎉' : `${Math.min(gradual.currentWeek, gradual.totalWeeks)}. hafta / ${gradual.totalWeeks}`}
+              </Text>
+              <View style={styles.heroTrack}>
+                <View style={[styles.heroFill, { width: `${Math.max(4, weekProgress * 100)}%` }]} />
+              </View>
+              <Text style={styles.heroText}>
+                Bugünkü hedefin {gradual.todayTarget} sigara
+                {gradual.zeroTargetDate && !planDone ? ` · Sıfır hedefi ${formatDate(gradual.zeroTargetDate)}` : ''}
+              </Text>
+            </>
+          )}
+        </LinearGradient>
+
+        {/* Key numbers */}
+        <View style={styles.grid}>
+          <Tile icon="ban" color={colors.error} value={formatCount(gradual.cigarettesAvoided)} label="İçilmeyen sigara" sub={`Başlangıç: günde ${gradual.startCount}`} />
+          <Tile icon="wallet" color={colors.secondary} value={formatMoney(gradual.moneySaved)} label="Cebinde kalan" />
+          <Tile
+            icon="trending-down"
+            color={colors.accent}
+            value={gradual.recentAverage === null ? '–' : gradual.recentAverage.toLocaleString('tr-TR', { maximumFractionDigits: 1 })}
+            label="Günlük ortalama"
+            sub={gradual.recentAverage === null ? 'Henüz giriş yok' : `Son ${Math.min(7, gradual.loggedDays)} giriş · %${gradual.reductionPercent} azalma`}
+          />
+          <Tile
+            icon="checkmark-done"
+            color={colors.success}
+            value={gradual.loggedDays ? `%${gradual.compliancePercent}` : '–'}
+            label="Hedefe uyum"
+            sub={gradual.loggedDays ? `${gradual.goalDays}/${gradual.loggedDays} gün hedefte` : 'Henüz giriş yok'}
+          />
+        </View>
+
+        {/* Last 7 days */}
+        {gradual.last7Days.length > 0 && (
+          <Section title="Son 7 gün" subtitle="Bir çubuğa dokunarak o günü düzenleyebilirsin">
+            <WeekBarChart days={gradual.last7Days} onDayPress={(date) => router.push(`/daily-logger?date=${date}`)} />
+          </Section>
+        )}
+
+        {/* Streaks */}
+        <View style={styles.grid}>
+          <Tile icon="flame" color={colors.streakFire} value={`${gradual.disciplineStreak} gün`} label="Disiplin serisi" sub="Arka arkaya hedefte" />
+          <Tile icon="leaf" color={colors.success} value={`${gradual.smokeFreeStreak} gün`} label="Sigarasız seri" sub="Arka arkaya 0 sigara" />
+        </View>
+
+        {/* Reduction benefits (replaces the generic health list for reducers) */}
+        <Section title="Azaltmanın kazanımları" subtitle="Başlangıç miktarına göre vücuduna girmeyenler">
+          <Row label="Daha az sigara" value={`${formatCount(gradual.cigarettesAvoided)} adet`} strong />
+          <Row label="≈ Daha az katran" value={`${formatCount(gradual.cigarettesAvoided * TAR_MG_PER_CIGARETTE)} mg`} />
+          <Row label="≈ Daha az nikotin" value={`${formatCount(gradual.cigarettesAvoided * NICOTINE_MG_PER_CIGARETTE)} mg`} />
+          <Row label="Sigara molasından kurtulan" value={formatDuration(gradual.cigarettesAvoided * MINUTES_PER_CIGARETTE)} />
+          <Text style={[styles.footnote, { color: colors.textTertiary }]}>
+            Katran ve nikotin, AB sınır değerlerine (sigara başına 10 mg / 1 mg) göre yaklaşık hesaplanır.
+          </Text>
+        </Section>
+
+        {/* Health timeline: real recovery starts once smoke-free */}
+        <Section
+          title="Vücudundaki iyileşme"
+          subtitle={gradual.smokeFreeStreak > 0
+            ? `${gradual.smokeFreeStreak} gündür sigarasızsın, iyileşme başladı`
+            : 'Tamamen sigarasız günlerinde başlar. İlk 0 sigaralı günün bu çizelgeyi başlatır.'}
+        >
+          <HealthTimeline minutesSmokeFree={gradual.smokeFreeStreak * 24 * 60} />
+        </Section>
+
+        {cravingsSection}
+        {badgesLink}
+      </ScrollView>
     );
   }
 
-  // Calculate stats
-  const cigarettesNotSmoked = profile?.quitMethod === 'gradual'
-    ? calculateGradualCigarettesAvoided(profile, dailyStats)
-    : currentStreak * profile.dailyCigaretteCount;
-
-  const moneySaved = profile?.quitMethod === 'gradual'
-    ? calculateGradualMoneySaved(profile, cigarettesNotSmoked)
-    : Math.floor((cigarettesNotSmoked / profile.cigarettesPerPack) * profile.packPrice);
-
-  const timeSavedHours = Math.floor((cigarettesNotSmoked * 5) / 60);
-  const lifeSavedDays = Math.floor((cigarettesNotSmoked * 11) / (60 * 24)); // 11 min per cigarette
-
-  // Health benefits timeline
-  const healthBenefits = [
-    { time: '20 dakika', benefit: 'Kalp atışı ve kan basıncı normale döner' },
-    { time: '12 saat', benefit: 'Kandaki karbonmonoksit seviyesi normale döner' },
-    { time: '2 hafta', benefit: 'Dolaşım iyileşir, akciğer fonksiyonu artar' },
-    { time: '1-9 ay', benefit: 'Öksürük ve nefes darlığı azalır' },
-    { time: '1 yıl', benefit: 'Kalp hastalığı riski yarıya iner' },
-    { time: '5 yıl', benefit: 'İnme riski sigara içmeyenlerle eşit olur' },
-    { time: '10 yıl', benefit: 'Akciğer kanseri riski yarıya iner' },
-    { time: '15 yıl', benefit: 'Kalp hastalığı riski sigara içmeyenlerle eşit olur' },
-  ];
+  // ── IMMEDIATE ──────────────────────────────────
+  if (!immediate) return null;
+  const quitMoment = new Date(getQuitTimestamp(profile.quitDate));
+  const sinceLabel = quitMoment.toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
   return (
-    <ScrollView 
+    <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
     >
-      {/* Header */}
-      <Text style={[styles.title, { color: colors.text }]}>İstatistikler 📊</Text>
-      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-        Yolculuğun ve sağlık faydaların
-      </Text>
+      {header}
 
-      {/* Stats Summary */}
-      <View style={styles.statsGrid}>
-        <View style={[styles.statBox, { backgroundColor: colors.card }]}>
-          <View style={[styles.statIconCircle, { backgroundColor: colors.primary + '20' }]}>
-            <Ionicons name="calendar" size={24} color={colors.primary} />
-          </View>
-          <Text style={[styles.statValue, { color: colors.text }]}>{currentStreak}</Text>
-          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Gün</Text>
-        </View>
-
-        <View style={[styles.statBox, { backgroundColor: colors.card }]}>
-          <View style={[styles.statIconCircle, { backgroundColor: colors.error + '20' }]}>
-            <Ionicons name="close-circle" size={24} color={colors.error} />
-          </View>
-          <Text style={[styles.statValue, { color: colors.text }]}>{cigarettesNotSmoked}</Text>
-          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Sigara</Text>
-        </View>
-
-        <View style={[styles.statBox, { backgroundColor: colors.card }]}>
-          <View style={[styles.statIconCircle, { backgroundColor: colors.secondary + '20' }]}>
-            <Ionicons name="cash" size={24} color={colors.secondary} />
-          </View>
-          <Text style={[styles.statValue, { color: colors.text }]}>₺{moneySaved}</Text>
-          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Tasarruf</Text>
-        </View>
-
-        <View style={[styles.statBox, { backgroundColor: colors.card }]}>
-          <View style={[styles.statIconCircle, { backgroundColor: colors.accent + '20' }]}>
-            <Ionicons name="heart" size={24} color={colors.error} />
-          </View>
-          <Text style={[styles.statValue, { color: colors.text }]}>{lifeSavedDays}</Text>
-          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Gün Hayat</Text>
-        </View>
-
-        {/* Gradual-specific stats */}
-        {profile.quitMethod === 'gradual' && (
+      {/* Smoke-free time hero */}
+      <LinearGradient colors={[colors.primary, colors.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+        {isPreparation ? (
           <>
-            <View style={[styles.statBox, { backgroundColor: colors.card }]}>
-              <View style={[styles.statIconCircle, { backgroundColor: colors.success + '20' }]}>
-                <Ionicons name="flag" size={24} color={colors.success} />
-              </View>
-              <Text style={[styles.statValue, { color: colors.text }]}>
-                {profile.gradualStartCount || profile.dailyCigaretteCount}
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Başlangıç</Text>
-            </View>
-
-            <View style={[styles.statBox, { backgroundColor: colors.card }]}>
-              <View style={[styles.statIconCircle, { backgroundColor: colors.primary + '20' }]}>
-                <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-              </View>
-              <Text style={[styles.statValue, { color: colors.text }]}>
-                {profile.gradualCurrentTarget || 0}
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Şimdi</Text>
-            </View>
-
-            <View style={[styles.statBox, { backgroundColor: colors.card }]}>
-              <View style={[styles.statIconCircle, { backgroundColor: colors.accent + '20' }]}>
-                <Ionicons name="trending-down" size={24} color={colors.accent} />
-              </View>
-              <Text style={[styles.statValue, { color: colors.text }]}>
-                %{Math.floor(((profile.gradualStartCount || profile.dailyCigaretteCount) - (profile.gradualCurrentTarget || 0)) / (profile.gradualStartCount || profile.dailyCigaretteCount) * 100)}
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Azalma</Text>
-            </View>
+            <Text style={styles.heroLabel}>BAŞLAMAYA KALAN</Text>
+            <Text style={styles.heroValue}>{daysToStart} gün</Text>
+            <Text style={styles.heroText}>{formatDate(startKey, true)} günü başlıyorsun</Text>
+          </>
+        ) : (
+          <>
+            <Text style={styles.heroLabel}>SİGARASIZ GEÇEN SÜRE</Text>
+            <Text style={styles.heroValue}>{formatDuration(immediate.minutesSmokeFree)}</Text>
+            <Text style={styles.heroText}>{sinceLabel} tarihinden beri</Text>
           </>
         )}
-      </View>
-
-      {/* Achievements CTA */}
-      <TouchableOpacity
-        style={[styles.achievementsCTA, { 
-          backgroundColor: colors.card,
-          borderColor: colors.primary,
-        }]}
-        onPress={() => router.push('/achievements')}
-        activeOpacity={0.7}
-      >
-        <LinearGradient
-          colors={[colors.primary + '20', colors.accent + '20']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.achievementsCTAGradient}
-        >
-          <View style={styles.achievementsCTAContent}>
-            <View style={[styles.achievementsCTAIcon, { backgroundColor: colors.primary }]}>
-              <Ionicons name="trophy" size={32} color="#FFF" />
-            </View>
-            <View style={styles.achievementsCTAText}>
-              <Text style={[styles.achievementsCTATitle, { color: colors.text }]}>
-                Rozetlerim 🏆
-              </Text>
-              <Text style={[styles.achievementsCTADesc, { color: colors.textSecondary }]}>
-                Başarılarını ve kazandığın rozetleri gör
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={24} color={colors.primary} />
-          </View>
-        </LinearGradient>
-      </TouchableOpacity>
-
-      {/* TODO: Future Feature - Charts & Graphs */}
-      {/* 
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          Grafikler 📈
-        </Text>
-        <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-          Haftalık ve aylık ilerleme trendlerin
-        </Text>
-        Add charts here: streak trend, money saved trend, crisis count
-      </View>
-      */}
-
-      {/* Health Benefits */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          Sağlık Faydaları 💚
-        </Text>
-        <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-          Vücudunun iyileşme süreci
-        </Text>
-        <View style={styles.timeline}>
-          {healthBenefits.map((benefit, index) => (
-            <View key={index} style={styles.timelineItem}>
-              <View style={styles.timelineDot}>
-                <View style={[styles.dot, { backgroundColor: colors.primary }]} />
-                {index < healthBenefits.length - 1 && (
-                  <View style={[styles.line, { backgroundColor: colors.cardBorder }]} />
-                )}
-              </View>
-              <View style={[styles.timelineCard, { backgroundColor: colors.card }]}>
-                <Text style={[styles.timelineTime, { color: colors.primary }]}>
-                  {benefit.time}
-                </Text>
-                <Text style={[styles.timelineBenefit, { color: colors.text }]}>
-                  {benefit.benefit}
-                </Text>
-              </View>
-            </View>
-          ))}
-        </View>
-      </View>
-
-      {/* Motivational Quote */}
-      <LinearGradient
-        colors={[colors.primary, colors.primaryDark]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.quoteCard}
-      >
-        <Ionicons name="sparkles" size={32} color="#FFF" style={styles.quoteIcon} />
-        <Text style={styles.quoteText}>
-          "Her gün sigarasız geçen bir gündür. Sen inanılmaz güçlüsün!"
-        </Text>
-        <Text style={styles.quoteAuthor}>- Smoof 💚</Text>
       </LinearGradient>
+
+      {/* Key numbers */}
+      <View style={styles.grid}>
+        <Tile icon="ban" color={colors.error} value={formatCount(immediate.cigarettesAvoided)} label="İçilmeyen sigara" sub={`Günde ${profile.dailyCigaretteCount} sigaraya göre`} />
+        <Tile icon="wallet" color={colors.secondary} value={formatMoney(immediate.moneySaved)} label="Cebinde kalan" sub={`Günde ${formatMoney(immediate.dailyCost)}`} />
+        <Tile icon="time" color={colors.accent} value={formatDuration(immediate.timeSavedMinutes)} label="Kazanılan zaman" sub={`Sigara başına ${MINUTES_PER_CIGARETTE} dk`} />
+        <Tile icon="shield-checkmark" color={colors.success} value={`${cravings.resisted}`} label="Atlatılan istek" sub={`${immediate.flawlessDays} gündür kaymasız`} />
+      </View>
+
+      {/* Savings projection */}
+      <Section title="Tasarruf planın" subtitle="Bu tempoyla cebinde kalacak para">
+        <Row label="1 hafta" value={formatMoney(immediate.dailyCost * 7)} />
+        <Row label="1 ay" value={formatMoney(immediate.dailyCost * 30)} />
+        <Row label="6 ay" value={formatMoney(immediate.dailyCost * 182)} />
+        <Row label="1 yıl" value={formatMoney(immediate.dailyCost * 365)} strong />
+      </Section>
+
+      {/* Health timeline */}
+      <Section
+        title="Vücudundaki iyileşme"
+        subtitle={isPreparation ? 'Başladığın andan itibaren işlemeye başlar' : 'Son sigarandan bu yana vücudunda olanlar'}
+      >
+        <HealthTimeline minutesSmokeFree={immediate.minutesSmokeFree} />
+      </Section>
+
+      {cravingsSection}
+      {badgesLink}
     </ScrollView>
   );
 }
@@ -228,158 +310,151 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: Spacing.lg,
-    paddingTop: Spacing['4xl'],
-    paddingBottom: Spacing['4xl'],
+    paddingHorizontal: 20,
+    paddingBottom: 40,
   },
   title: {
-    fontSize: Typography.sizes['3xl'],
-    fontWeight: Typography.weights.bold,
-    marginBottom: Spacing.xs,
+    fontSize: 28,
+    fontWeight: '800',
   },
   subtitle: {
-    fontSize: Typography.sizes.base,
-    marginBottom: Spacing.xl,
+    fontSize: 15,
+    marginTop: 2,
+    marginBottom: 16,
   },
-  statsGrid: {
+  hero: {
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+  },
+  heroLabel: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+  },
+  heroValue: {
+    color: '#FFF',
+    fontSize: 32,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  heroTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    overflow: 'hidden',
+    marginTop: 12,
+  },
+  heroFill: {
+    height: '100%',
+    borderRadius: 4,
+    backgroundColor: '#FFF',
+  },
+  heroText: {
+    color: 'rgba(255,255,255,0.95)',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.md,
-    marginBottom: Spacing.xl,
+    gap: 12,
+    marginBottom: 16,
   },
-  statBox: {
-    flex: 1,
-    minWidth: '45%',
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  tile: {
+    flexGrow: 1,
+    flexBasis: '45%',
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
   },
-  statIconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  tileIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.sm,
+    marginBottom: 10,
   },
-  statValue: {
-    fontSize: Typography.sizes['2xl'],
-    fontWeight: Typography.weights.bold,
-    marginBottom: Spacing.xs,
+  tileValue: {
+    fontSize: 22,
+    fontWeight: '800',
   },
-  statLabel: {
-    fontSize: Typography.sizes.sm,
+  tileLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  tileSub: {
+    fontSize: 11,
+    marginTop: 4,
   },
   section: {
-    marginBottom: Spacing['2xl'],
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: Typography.weights.bold,
-    marginBottom: Spacing.xs,
+    fontSize: 17,
+    fontWeight: '700',
   },
   sectionSubtitle: {
-    fontSize: Typography.sizes.sm,
-    marginBottom: Spacing.lg,
+    fontSize: 13,
+    marginTop: 2,
+    lineHeight: 18,
   },
-  achievementsCTA: {
-    borderRadius: BorderRadius.xl,
-    marginBottom: Spacing.xl,
-    borderWidth: 2,
+  sectionBody: {
+    marginTop: 14,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  rowLabel: {
+    fontSize: 14,
+  },
+  rowValue: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  footnote: {
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 8,
+  },
+  emptyText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  badgesLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  badgesTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  badgesCount: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  track: {
+    height: 6,
+    borderRadius: 3,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
   },
-  achievementsCTAGradient: {
-    padding: Spacing.lg,
-  },
-  achievementsCTAContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  achievementsCTAIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  achievementsCTAText: {
-    flex: 1,
-  },
-  achievementsCTATitle: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
-    marginBottom: Spacing.xs,
-  },
-  achievementsCTADesc: {
-    fontSize: Typography.sizes.sm,
-  },
-  timeline: {
-    gap: 0,
-  },
-  timelineItem: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-  },
-  timelineDot: {
-    alignItems: 'center',
-    width: 24,
-  },
-  dot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  line: {
-    width: 2,
-    flex: 1,
-    marginTop: Spacing.xs,
-  },
-  timelineCard: {
-    flex: 1,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.md,
-  },
-  timelineTime: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.bold,
-    marginBottom: Spacing.xs,
-  },
-  timelineBenefit: {
-    fontSize: Typography.sizes.sm,
-    lineHeight: Typography.sizes.sm * 1.5,
-  },
-  quoteCard: {
-    padding: Spacing.xl,
-    borderRadius: BorderRadius.xl,
-    alignItems: 'center',
-    marginTop: Spacing.lg,
-  },
-  quoteIcon: {
-    marginBottom: Spacing.md,
-  },
-  quoteText: {
-    color: '#FFFFFF',
-    fontSize: Typography.sizes.lg,
-    textAlign: 'center',
-    fontStyle: 'italic',
-    marginBottom: Spacing.md,
-    lineHeight: Typography.sizes.lg * 1.5,
-  },
-  quoteAuthor: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
+  fill: {
+    height: '100%',
+    borderRadius: 3,
   },
 });
