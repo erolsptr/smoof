@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated } from 'react-native';
+import { Smoof, type SmoofMood } from '@/components/smoof/Smoof';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useStatsStore } from '@/store/statsStore';
@@ -38,7 +39,6 @@ export default function HomeScreen() {
   const freezesRemaining = (profile?.streakFreezes || 0) - (profile?.streakFreezesUsed || 0);
   
   // Animation values
-  const mascotScale = useRef(new Animated.Value(1)).current;
   const streakScale = useRef(new Animated.Value(0)).current;
   const streakOpacity = useRef(new Animated.Value(0)).current;
   const cardsOpacity = useRef(new Animated.Value(0)).current;
@@ -46,22 +46,6 @@ export default function HomeScreen() {
   
   // Entrance animations
   useEffect(() => {
-    // Mascot bounce
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(mascotScale, {
-          toValue: 1.1,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(mascotScale, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-    
     // Streak entrance
     Animated.parallel([
       Animated.spring(streakScale, {
@@ -133,7 +117,7 @@ export default function HomeScreen() {
   const isGradual = profile?.quitMethod === 'gradual';
 
   // Centered mascot + greeting; the freeze badge floats in the corner so it doesn't shift them
-  const renderCenteredHeader = (title: string, subtitle: string) => (
+  const renderCenteredHeader = (title: string, subtitle: string, mood: SmoofMood = 'happy') => (
     <View style={styles.centeredHeader}>
       <FreezeBadge
         remaining={freezesRemaining}
@@ -143,13 +127,7 @@ export default function HomeScreen() {
           : 'Kayma anında freeze kullanarak sigarasız günlerini koruyabilirsin.'}
         style={styles.freezeBadgeCorner}
       />
-      <Animated.View style={{ transform: [{ scale: mascotScale }] }}>
-        <Image
-          source={require('../../../assets/smoof.png')}
-          style={styles.centeredMascot}
-          resizeMode="contain"
-        />
-      </Animated.View>
+      <Smoof mood={mood} size={120} animation={mood === 'excited' ? 'bounce' : 'bob'} style={styles.centeredMascot} />
       <Text style={[styles.greeting, { color: colors.text }]}>{title}</Text>
       <Text style={[styles.subGreeting, { color: colors.textSecondary }]}>{subtitle}</Text>
     </View>
@@ -221,7 +199,7 @@ export default function HomeScreen() {
         style={[styles.container, { backgroundColor: colors.background }]}
         contentContainerStyle={[styles.screenContent, { paddingTop: insets.top + 12 }]}
       >
-        {renderCenteredHeader('Sözünü aldım! 🤝', getPreparationMessage())}
+        {renderCenteredHeader('Sözünü aldım! 🤝', getPreparationMessage(), 'excited')}
 
         <Animated.View style={{ opacity: streakOpacity, transform: [{ scale: streakScale }] }}>
           <LinearGradient
@@ -273,6 +251,14 @@ export default function HomeScreen() {
   if (profile && isGradual) {
     const target = getCurrentGradualTarget(profile);
     const unloggedDays = countUnloggedDays(profile, dailyStats);
+    // Smoof reacts to today's entry: a bit sad *with* you when over target
+    const todayEntry = gradualMetrics?.last7Days.find((d) => d.date === getTodayString());
+    const gradualMood: SmoofMood = todayEntry?.metGoal === false ? 'supportive' : todayEntry?.smoked === 0 ? 'proud' : 'happy';
+    const gradualGreeting = todayEntry?.metGoal === false
+      ? 'Yarın birlikte 💚'
+      : todayEntry?.metGoal
+        ? 'Bugün hedeftesin! 💪'
+        : 'Merhaba! 👋';
 
     return (
       <ScrollView
@@ -281,15 +267,9 @@ export default function HomeScreen() {
       >
         {/* Header: mascot + greeting + freeze badge */}
         <View style={styles.gradualHeader}>
-          <Animated.View style={{ transform: [{ scale: mascotScale }] }}>
-            <Image
-              source={require('../../../assets/smoof.png')}
-              style={styles.gradualMascot}
-              resizeMode="contain"
-            />
-          </Animated.View>
+          <Smoof mood={gradualMood} size={76} framing="portrait" animation="bob" />
           <View style={styles.gradualGreeting}>
-            <Text style={[styles.gradualHello, { color: colors.text }]}>Merhaba! 👋</Text>
+            <Text style={[styles.gradualHello, { color: colors.text }]}>{gradualGreeting}</Text>
             <Text style={[styles.gradualTarget, { color: colors.textSecondary }]}>
               Bugünkü hedefin:{' '}
               <Text style={{ color: colors.text, fontWeight: '700' }}>{target} sigara</Text>
@@ -400,7 +380,7 @@ export default function HomeScreen() {
       contentContainerStyle={[styles.screenContent, { paddingTop: insets.top + 12 }]}
     >
       {isDayZero
-        ? renderCenteredHeader('Bugün büyük gün! 🚀', 'İlk günün başladı, yanındayım')
+        ? renderCenteredHeader('Bugün büyük gün! 🚀', 'İlk günün başladı, yanındayım', 'excited')
         : renderCenteredHeader('Merhaba! Bugün nasılsın?', getMotivationalMessage())}
 
       {/* Streak hero */}
@@ -548,8 +528,6 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   centeredMascot: {
-    width: 96,
-    height: 96,
     marginBottom: 8,
   },
   greeting: {
@@ -752,10 +730,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     marginBottom: 20,
-  },
-  gradualMascot: {
-    width: 56,
-    height: 56,
   },
   gradualGreeting: {
     flex: 1,

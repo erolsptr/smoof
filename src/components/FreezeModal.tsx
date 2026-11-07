@@ -7,6 +7,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Smoof } from '@/components/smoof/Smoof';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Spacing, Typography, BorderRadius } from '@/constants';
 
@@ -44,19 +45,17 @@ export function FreezeModal({
     >
       <View style={styles.overlay}>
         <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
-          {/* Warning Icon Circle */}
-          <View style={[styles.iconCircle, { backgroundColor: colors.warning + '20' }]}>
-            <Ionicons name="warning" size={48} color={colors.warning} />
-          </View>
+          {/* Smoof is a little sad with you, but believes in you */}
+          <Smoof mood="supportive" size={120} animation="bob" style={styles.smoof} />
 
           {/* Title */}
           <Text style={[styles.title, { color: colors.text }]}>
-            Hedef Aşıldı
+            Hedefi biraz aştık
           </Text>
 
           {/* Message */}
           <Text style={[styles.message, { color: colors.textSecondary }]}>
-            Bugün hedefin {target} sigaraydı, {cigaretteCount} sigara girdin.
+            Bugün hedefin {target} sigaraydı, {cigaretteCount} sigara girdin. Olsun, birlikte toparlarız 💚
           </Text>
 
           {/* Freeze Info Card */}
@@ -123,6 +122,9 @@ export function FreezeModal({
 }
 
 const styles = StyleSheet.create({
+  smoof: {
+    marginBottom: Spacing.sm,
+  },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -147,14 +149,6 @@ const styles = StyleSheet.create({
         elevation: 12,
       },
     }),
-  },
-  iconCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.lg,
   },
   title: {
     fontSize: Typography.sizes['2xl'],

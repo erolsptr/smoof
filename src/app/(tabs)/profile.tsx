@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +14,8 @@ import { getDateString, getQuitTimestamp, getTodayString, toDateKey } from '@/ut
 import { getCurrentGradualTarget, getTrackingStartDate } from '@/utils/gradualHelpers';
 import { getAchievementProgress, isAchievementAvailable } from '@/utils/progressMetrics';
 import { EditValueModal } from '@/components/EditValueModal';
+import { Smoof } from '@/components/smoof/Smoof';
+import { SKINS } from '@/components/smoof/palette';
 
 type EditField = 'packPrice' | 'perPack' | 'target' | null;
 
@@ -164,9 +166,24 @@ export default function ProfileScreen() {
     >
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleSmoofTap} activeOpacity={0.8}>
-          <Image source={require('../../../assets/smoof.png')} style={styles.avatar} resizeMode="contain" />
-        </TouchableOpacity>
+        {/* ID-photo Smoof (5 taps = test mode) */}
+        <View>
+          <TouchableOpacity
+            onPress={handleSmoofTap}
+            activeOpacity={0.9}
+            style={[styles.idPhoto, { backgroundColor: SKINS[profile.avatar?.skin ?? 'mint'].belly, borderColor: colors.card }]}
+          >
+            <Smoof mood="calm" framing="portrait" size={124} animation="none" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.editAvatar, { backgroundColor: colors.primary, borderColor: colors.background }]}
+            onPress={() => router.push('/avatar')}
+            accessibilityLabel="Smoof'unu düzenle"
+            hitSlop={8}
+          >
+            <Ionicons name="color-palette" size={18} color="#FFF" />
+          </TouchableOpacity>
+        </View>
         <Text style={[styles.name, { color: colors.text }]}>Profilim</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
         <View style={[styles.methodChip, { backgroundColor: colors.primary + '18' }]}>
@@ -276,6 +293,14 @@ export default function ProfileScreen() {
       {/* Settings */}
       <Text style={[styles.sectionTitle, { color: colors.text }]}>Ayarlar</Text>
       <View style={[styles.card, styles.listCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+        <TouchableOpacity style={styles.infoRow} onPress={() => router.push('/avatar')}>
+          <View style={[styles.infoIcon, { backgroundColor: colors.primary + '18' }]}>
+            <Ionicons name="color-palette" size={18} color={colors.primary} />
+          </View>
+          <Text style={[styles.settingLabel, { color: colors.text }]}>Smoof’umu düzenle</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+        </TouchableOpacity>
+        <Divider />
         <TouchableOpacity style={styles.infoRow} onPress={() => router.push('/settings/notifications')}>
           <View style={[styles.infoIcon, { backgroundColor: colors.textSecondary + '18' }]}>
             <Ionicons name="notifications" size={18} color={colors.textSecondary} />
@@ -408,10 +433,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
-  avatar: {
-    width: 96,
-    height: 96,
-    marginBottom: 8,
+  idPhoto: {
+    width: 128,
+    height: 128,
+    borderRadius: 28,
+    borderWidth: 4,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  editAvatar: {
+    position: 'absolute',
+    right: -6,
+    bottom: 4,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   name: {
     fontSize: 24,

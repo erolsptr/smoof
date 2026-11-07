@@ -21,6 +21,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { formatDateShort, getGradualTargetForDate, getTrackingStartDate } from '@/utils/gradualHelpers';
 import { getTodayString } from '@/utils/dateHelpers';
 import { FreezeModal } from '@/components/FreezeModal';
+import { Smoof, type SmoofMood } from '@/components/smoof/Smoof';
+
+type Reaction = 'zero' | 'freeze' | 'restart';
+
+const REACTIONS: Record<Reaction, { mood: SmoofMood; title: string; text: string }> = {
+  zero: { mood: 'proud', title: 'İlk kez 0 sigara! 🎉', text: 'Sigarasız serin başladı. Çok güçlüsün! 🌟' },
+  freeze: { mood: 'wink', title: 'Şşş, çaktırma! 🤫', text: 'Freeze kullandın, disiplin serin korundu. Devam ediyoruz.' },
+  restart: { mood: 'encourage', title: 'Yeniden başlıyoruz 💪', text: 'Bugün zorlandık, olsun. Yarın yeni bir gün ve ben yanındayım.' },
+};
 
 /**
  * Daily Logger Screen - For gradual reduction users
@@ -40,7 +49,8 @@ export default function DailyLoggerScreen() {
   const isToday = targetDate === today;
   
   const [cigaretteCount, setCigaretteCount] = useState('');
-  const [showCelebration, setShowCelebration] = useState(false);
+  // Smoof's short reaction after saving (auto-closes, then goes back)
+  const [reaction, setReaction] = useState<Reaction | null>(null);
   const [previousDayCount, setPreviousDayCount] = useState(-1);
   const [freezeModalVisible, setFreezeModalVisible] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
@@ -124,17 +134,20 @@ export default function DailyLoggerScreen() {
       metGoal: count <= target,
     });
 
-    // Show celebration modal if first time reaching 0
+    // Celebrate the first time reaching 0
     if (count === 0 && previousDayCount !== 0) {
-      setShowCelebration(true);
-      // Auto-close after 3 seconds
-      setTimeout(() => {
-        setShowCelebration(false);
-        router.back();
-      }, 3000);
+      showReaction('zero');
     } else {
       router.back();
     }
+  };
+
+  const showReaction = (r: Reaction) => {
+    setReaction(r);
+    setTimeout(() => {
+      setReaction(null);
+      router.back();
+    }, 2600);
   };
 
   const handleUseFreeze = async () => {
@@ -149,6 +162,8 @@ export default function DailyLoggerScreen() {
         targetCigarettes: target,
         metGoal: true, // Treat as goal met because freeze was used
       });
+      showReaction('freeze');
+      return;
     }
     router.back();
   };
@@ -163,7 +178,7 @@ export default function DailyLoggerScreen() {
       targetCigarettes: target,
       metGoal: false,
     });
-    router.back();
+    showReaction('restart');
   };
 
   const handleCorrection = () => {
@@ -277,22 +292,20 @@ export default function DailyLoggerScreen() {
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
 
-      {/* Celebration Modal */}
-      <Modal
-        visible={showCelebration}
-        transparent
-        animationType="fade"
-      >
+      {/* Smoof reaction */}
+      <Modal visible={reaction !== null} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={[styles.celebrationCard, { backgroundColor: colors.card }]}>
-            <Text style={styles.celebrationEmoji}>🎉</Text>
-            <Text style={[styles.celebrationTitle, { color: colors.text }]}>
-              İlk Kez 0 Sigara!
-            </Text>
-            <Text style={[styles.celebrationText, { color: colors.textSecondary }]}>
-              Sigarasız streak'in başladı! 🌟
-            </Text>
-          </View>
+          {reaction && (
+            <View style={[styles.celebrationCard, { backgroundColor: colors.card }]}>
+              <Smoof mood={REACTIONS[reaction].mood} size={150} animation={reaction === 'freeze' ? 'bob' : 'bounce'} style={styles.reactionSmoof} />
+              <Text style={[styles.celebrationTitle, { color: colors.text }]}>
+                {REACTIONS[reaction].title}
+              </Text>
+              <Text style={[styles.celebrationText, { color: colors.textSecondary }]}>
+                {REACTIONS[reaction].text}
+              </Text>
+            </View>
+          )}
         </View>
       </Modal>
 
@@ -406,9 +419,8 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 12,
   },
-  celebrationEmoji: {
-    fontSize: 80,
-    marginBottom: Spacing.lg,
+  reactionSmoof: {
+    marginBottom: Spacing.md,
   },
   celebrationTitle: {
     fontSize: Typography.sizes['2xl'],

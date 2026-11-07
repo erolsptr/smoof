@@ -3,10 +3,10 @@ import {
   Text, 
   StyleSheet, 
   TouchableOpacity, 
-  Image,
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Smoof } from '@/components/smoof/Smoof';
 import { useState } from 'react';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useOnboardingStore } from '@/store/onboardingStore';
@@ -62,11 +62,7 @@ export default function OnboardingStep5Plan() {
         </View>
 
         {/* Mascot */}
-        <Image 
-          source={require('../../../assets/smoof.png')}
-          style={styles.mascot}
-          resizeMode="contain"
-        />
+        <Smoof mood="excited" size={80} animation="bob" style={styles.mascot} />
         
         {/* Question */}
         <Text style={[styles.question, { color: colors.text }]}>
@@ -210,7 +206,6 @@ const styles = StyleSheet.create({
   },
   mascot: {
     width: 80,
-    height: 80,
     marginBottom: Spacing.xl,
   },
   question: {

@@ -5,12 +5,12 @@ import {
   TouchableOpacity, 
   Animated,
   ScrollView,
-  Image,
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { Smoof } from '@/components/smoof/Smoof';
 import { useProgress } from '@/hooks/useProgress';
 import { formatDuration } from '@/utils/milestones';
 import { getPackCost } from '@/utils/progressMetrics';
@@ -209,10 +209,12 @@ export default function CrisisScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.success }]}>
         <View style={styles.resultContent}>
-          <Text style={styles.resultMascot}>🎉</Text>
-          <Text style={styles.resultTitle}>Harika İş Çıkardın!</Text>
+          <View style={styles.proudHalo}>
+            <Smoof mood="proud" size={200} animation="bounce" />
+          </View>
+          <Text style={styles.resultTitle}>Çok güçlüsün! 💪</Text>
           <Text style={styles.resultMessage}>
-            Direndin ve kazandın! Smoof seninle gurur duyuyor 💚
+            O isteği yendin. Smoof seninle gurur duyuyor 💚
           </Text>
           
           <TouchableOpacity
@@ -251,13 +253,9 @@ export default function CrisisScreen() {
       return (
         <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
           <View style={styles.slipContent}>
-            <Image 
-              source={require('../../assets/smoof.png')}
-              style={styles.slipMascotImage}
-              resizeMode="contain"
-            />
+            <Smoof mood="shocked" size={130} animation="shake" style={styles.slipMascot} />
             <Text style={[styles.slipTitle, { color: colors.text }]}>
-              Ne Oldu?
+              Ne oldu öyle yaaa? 😮
             </Text>
             <Text style={[styles.slipSubtitle, { color: colors.textSecondary }]}>
               Neyin tetiklediğini bilirsek, gelecekte daha hazırlıklı oluruz
@@ -311,11 +309,7 @@ export default function CrisisScreen() {
       return (
         <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
           <View style={styles.slipContent}>
-            <Image 
-              source={require('../../assets/smoof.png')}
-              style={styles.slipMascotImage}
-              resizeMode="contain"
-            />
+            <Smoof mood="supportive" size={130} animation="bob" style={styles.slipMascot} />
             <Text style={[styles.slipTitle, { color: colors.text }]}>
               Sorun Değil
             </Text>
@@ -408,22 +402,18 @@ export default function CrisisScreen() {
       >
         {/* Mascot with status chip */}
         <View style={styles.resultMascotWrap}>
-          <Image
-            source={require('../../assets/smoof.png')}
-            style={styles.resultMascotImage}
-            resizeMode="contain"
-          />
+          <Smoof mood={usedFreeze ? 'wink' : 'encourage'} size={140} animation={usedFreeze ? 'bob' : 'bounce'} />
           <View style={[styles.resultChip, { backgroundColor: usedFreeze ? colors.accent : colors.primary, borderColor: colors.background }]}>
             <Ionicons name={usedFreeze ? 'snow' : 'refresh'} size={20} color="#FFF" />
           </View>
         </View>
 
         <Text style={[styles.resultHeading, { color: colors.text }]}>
-          {usedFreeze ? 'Streak’in korundu!' : 'Yeniden başlıyoruz 💚'}
+          {usedFreeze ? 'Şşş, çaktırma! 🤫' : 'Yeniden başlıyoruz 💚'}
         </Text>
         <Text style={[styles.resultSub, { color: colors.textSecondary }]}>
           {usedFreeze
-            ? 'Freeze kalkanın devreye girdi. Kaldığın yerden devam ediyorsun.'
+            ? 'Freeze kalkanın devreye girdi, serin korundu. Kaldığımız yerden devam ediyoruz.'
             : 'Kayma, yolculuğun sonu değil. Çoğu kişi bırakmayı birkaç denemede başarır.'}
         </Text>
 
@@ -541,10 +531,11 @@ export default function CrisisScreen() {
         {/* Mascot - only the image scales, so the layout doesn't jump */}
         <View style={styles.mascotContainer}>
           <Animated.View style={{ transform: [{ scale: isBreathing ? breathScale : 1 }] }}>
-            <Image
-              source={require('../../assets/smoof.png')}
-              style={styles.mascotLarge}
-              resizeMode="contain"
+            {/* Craving: cranky & tired. Breathing: follows the phase */}
+            <Smoof
+              mood={isBreathing ? breathPhase : 'craving'}
+              size={140}
+              animation={isBreathing ? 'none' : 'sway'}
             />
           </Animated.View>
         </View>
@@ -666,10 +657,6 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
   },
-  mascotLarge: {
-    width: 140,
-    height: 140,
-  },
   breathPhaseIndicator: {
     alignSelf: 'center',
     flexDirection: 'row',
@@ -753,9 +740,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: Spacing.xl,
   },
-  resultMascot: {
-    fontSize: 120,
-    marginBottom: Spacing.xl,
+  proudHalo: {
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.lg,
+  },
+  slipMascot: {
+    alignSelf: 'center',
+    marginBottom: Spacing.md,
   },
   resultTitle: {
     fontSize: Typography.sizes['3xl'],
@@ -784,12 +780,6 @@ const styles = StyleSheet.create({
   slipContent: {
     padding: Spacing.lg,
     paddingTop: Spacing['4xl'],
-  },
-  slipMascotImage: {
-    width: 100,
-    height: 100,
-    alignSelf: 'center' as const,
-    marginBottom: Spacing.lg,
   },
   slipTitle: {
     fontSize: Typography.sizes['3xl'],
@@ -896,10 +886,6 @@ const styles = StyleSheet.create({
   resultMascotWrap: {
     alignSelf: 'center',
     marginBottom: Spacing.md,
-  },
-  resultMascotImage: {
-    width: 110,
-    height: 110,
   },
   resultChip: {
     position: 'absolute',

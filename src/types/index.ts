@@ -31,6 +31,23 @@ export interface UserProfile {
   // Streak freeze
   streakFreezes: number;
   streakFreezesUsed: number;
+
+  // The user's own Smoof (optional; defaults to the classic look)
+  avatar?: SmoofAvatar;
+}
+
+export type SmoofSkin = 'mint' | 'sky' | 'lilac' | 'peach' | 'pink' | 'sun';
+export type SmoofHair = 'none' | 'tuft' | 'spiky' | 'curly' | 'fringe';
+export type SmoofMustache = 'none' | 'classic' | 'handlebar';
+export type SmoofGlasses = 'none' | 'round' | 'square' | 'sun';
+
+export interface SmoofAvatar {
+  skin: SmoofSkin;
+  eyeColor: string;
+  hair: SmoofHair;
+  hairColor: string;
+  mustache: SmoofMustache;
+  glasses: SmoofGlasses;
 }
 
 export interface DailyStats {

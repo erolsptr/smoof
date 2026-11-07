@@ -8,9 +8,9 @@ import {
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
-  Image,
-} from 'react-native';
+  } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Smoof } from '@/components/smoof/Smoof';
 import { useState } from 'react';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useOnboardingStore } from '@/store/onboardingStore';
@@ -54,11 +54,7 @@ export default function Step2Screen() {
           </View>
 
           {/* Mascot */}
-          <Image 
-            source={require('../../../assets/smoof.png')}
-            style={styles.mascot}
-            resizeMode="contain"
-          />
+          <Smoof mood="calm" size={80} animation="bob" style={styles.mascot} />
           
           {/* Question */}
           <Text style={[styles.question, { color: colors.text }]}>
@@ -138,7 +134,6 @@ const styles = StyleSheet.create({
   },
   mascot: {
     width: 80,
-    height: 80,
     marginBottom: Spacing.xl,
   },
   question: {
