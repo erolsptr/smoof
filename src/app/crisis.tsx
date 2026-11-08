@@ -12,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Smoof } from '@/components/smoof/Smoof';
 import { useProgress } from '@/hooks/useProgress';
+import { newDate } from '@/utils/clock';
 import { formatDuration } from '@/utils/milestones';
 import { getPackCost } from '@/utils/progressMetrics';
 import { useRouter } from 'expo-router';
@@ -112,7 +113,7 @@ export default function CrisisScreen() {
   const handleResisted = async () => {
     // Log successful resistance
     await logCrisis({
-      timestamp: new Date().toISOString(),
+      timestamp: newDate().toISOString(),
       handled: true,
       method: isBreathing ? 'breathing' : 'motivation',
     });
@@ -141,7 +142,7 @@ export default function CrisisScreen() {
     
     if (success) {
       await logCrisis({
-        timestamp: new Date().toISOString(),
+        timestamp: newDate().toISOString(),
         handled: false,
         trigger: selectedTrigger || undefined,
       });
@@ -156,7 +157,7 @@ export default function CrisisScreen() {
   const handleContinueWithoutFreeze = async () => {
     // Log the crisis
     await logCrisis({
-      timestamp: new Date().toISOString(),
+      timestamp: newDate().toISOString(),
       handled: false,
       trigger: selectedTrigger || undefined,
     });
@@ -169,7 +170,7 @@ export default function CrisisScreen() {
     await useStatsStore.getState().recordSlip(1);
     
     // Reset: the new smoke-free period starts now (exact time, so health timers are right)
-    await useUserStore.getState().updateProfile({ quitDate: new Date().toISOString() });
+    await useUserStore.getState().updateProfile({ quitDate: newDate().toISOString() });
     useStatsStore.getState().syncStreaks(useUserStore.getState().profile);
     
     // Show result

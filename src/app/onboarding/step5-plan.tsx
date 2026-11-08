@@ -12,6 +12,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { useOnboardingStore } from '@/store/onboardingStore';
 import { Spacing, Typography, BorderRadius } from '@/constants';
 import { Ionicons } from '@expo/vector-icons';
+import { describeWeeklyPace } from '@/utils/gradualPlan';
 
 /**
  * Onboarding Step 5.5: Target Plan Selection
@@ -26,6 +27,8 @@ export default function OnboardingStep5Plan() {
   const [selectedWeeks, setSelectedWeeks] = useState<number | null>(null);
   
   const dailyCigs = data.dailyCigarettes || 0;
+  // Week 1 limit chosen on the previous step; the plan goes from there to 0
+  const firstTarget = data.gradualInitialTarget || dailyCigs;
   
   const planOptions = [
     { weeks: 4, label: 'Hızlı', icon: '🚀', colorKey: 'error' as const },
@@ -34,9 +37,8 @@ export default function OnboardingStep5Plan() {
     { weeks: 12, label: 'Çok Rahat', icon: '🌱', colorKey: 'success' as const },
   ];
 
-  const calculateWeeklyReduction = (weeks: number) => {
-    return Math.ceil(dailyCigs / weeks);
-  };
+  // Average weekly reduction (display/legacy only; the real plan is in gradualPlan.ts)
+  const calculateWeeklyReduction = (weeks: number) => Math.round((firstTarget / weeks) * 10) / 10;
 
   const handleContinue = () => {
     if (!selectedWeeks) return;
@@ -70,13 +72,12 @@ export default function OnboardingStep5Plan() {
         </Text>
         
         <Text style={[styles.hint, { color: colors.textSecondary }]}>
-          Başlangıç: {dailyCigs} sigara/gün → Hedef: 0 sigara/gün
+          1. hafta: {firstTarget} sigara/gün → Hedef: 0 sigara/gün
         </Text>
 
         {/* Plan Options */}
         <View style={styles.options}>
           {planOptions.map((option) => {
-            const weeklyReduction = calculateWeeklyReduction(option.weeks);
             const isSelected = selectedWeeks === option.weeks;
             const optionColor = colors[option.colorKey];
             
@@ -147,7 +148,7 @@ export default function OnboardingStep5Plan() {
                     styles.planDetailText,
                     { color: isSelected ? '#FFFFFF' : colors.textSecondary },
                   ]}>
-                    Her hafta yaklaşık {weeklyReduction} sigara azalt
+                    {describeWeeklyPace(firstTarget, option.weeks)}
                   </Text>
                 </View>
               </TouchableOpacity>

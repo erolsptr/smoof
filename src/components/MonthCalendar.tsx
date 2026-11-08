@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { DailyStats, UserProfile } from '@/types';
 import { getDateString, getTodayString, parseDateKey } from '@/utils/dateHelpers';
+import { newDate } from '@/utils/clock';
 import { getGradualTargetForDate, getTrackingStartDate } from '@/utils/gradualHelpers';
 
 type DayStatus = 'perfect' | 'good' | 'over' | 'empty' | 'locked' | 'future';
@@ -31,7 +32,7 @@ export function MonthCalendar({ profile, dailyStats, onDayPress }: MonthCalendar
   const startDate = getTrackingStartDate(profile);
 
   const [visibleMonth, setVisibleMonth] = useState(() => {
-    const now = new Date();
+    const now = newDate();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
 
@@ -40,7 +41,7 @@ export function MonthCalendar({ profile, dailyStats, onDayPress }: MonthCalendar
 
   // Navigation bounds: from the start month up to the current month
   const start = parseDateKey(startDate);
-  const now = new Date();
+  const now = newDate();
   const monthIndex = year * 12 + month;
   const canGoBack = monthIndex > start.getFullYear() * 12 + start.getMonth();
   const canGoForward = monthIndex < now.getFullYear() * 12 + now.getMonth();

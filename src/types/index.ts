@@ -4,6 +4,11 @@
 
 export type QuitMethod = 'immediate' | 'gradual';
 
+export interface GradualTargetChange {
+  from: string; // local date key (YYYY-MM-DD)
+  target: number; // daily limit from that day
+}
+
 export interface UserProfile {
   id: string;
   createdAt: string;
@@ -20,9 +25,12 @@ export interface UserProfile {
   // Gradual reduction (only for quitMethod: 'gradual')
   gradualStartDate?: string; // When gradual reduction started
   gradualStartCount?: number; // Starting cigarettes/day (e.g., 20)
-  gradualCurrentTarget?: number; // Current daily target (e.g., 8)
-  gradualTargetWeeks?: number; // Target duration in weeks (4, 6, 8, 12)
-  gradualWeeklyReduction?: number; // Weekly reduction amount
+  gradualInitialTarget?: number; // Week 1 daily limit chosen in onboarding (e.g., 14)
+  gradualCurrentTarget?: number; // Legacy: older profiles stored the week 1 limit here
+  gradualTargetWeeks?: number; // Weeks until 0 (4, 6, 8, 12)
+  gradualWeeklyReduction?: number; // Legacy/display only: average weekly reduction
+  /** Manual "lower my target" changes; each re-plans from its day to 0 by the same end date */
+  gradualTargetChanges?: GradualTargetChange[];
   
   // Personalization
   triggers: string[]; // e.g., ['coffee', 'stress', 'social']

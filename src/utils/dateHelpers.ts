@@ -8,6 +8,8 @@
  * entries made between 00:00 and 03:00 would land on the previous day.
  */
 
+import { newDate, now as clockNow } from '@/utils/clock';
+
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
@@ -24,7 +26,7 @@ export function getDateString(date: Date): string {
  * Get today's local date key (YYYY-MM-DD)
  */
 export function getTodayString(): string {
-  return getDateString(new Date());
+  return getDateString(newDate());
 }
 
 /**
@@ -115,7 +117,7 @@ export function getTimeSinceQuit(quitDate: string): {
   hours: number;
   minutes: number;
 } {
-  const diffMs = Math.max(0, Date.now() - getQuitTimestamp(quitDate));
+  const diffMs = Math.max(0, clockNow() - getQuitTimestamp(quitDate));
   
   const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));

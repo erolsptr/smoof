@@ -5,7 +5,7 @@
  */
 import type { Achievement, CrisisLog, DailyStats, UserProfile } from '@/types';
 import { addDays, daysBetween, getQuitTimestamp, getTodayString, toDateKey } from '@/utils/dateHelpers';
-import { getGradualTargetForDate, getTrackingStartDate } from '@/utils/gradualHelpers';
+import { getGradualTargetForDate, getGradualZeroDate, getTrackingStartDate } from '@/utils/gradualHelpers';
 
 const MINUTES_PER_DAY = 24 * 60;
 /** Average time one cigarette takes (break included) */
@@ -114,7 +114,7 @@ export interface GradualMetrics {
   todayTarget: number;
   currentWeek: number;
   totalWeeks: number;
-  /** First day the plan target reaches 0 (null if never within a year) */
+  /** First day the plan target reaches 0 */
   zeroTargetDate: string | null;
   loggedDays: number;
   goalDays: number;
@@ -178,14 +178,7 @@ export function getGradualMetrics(profile: UserProfile, dailyStats: DailyStats[]
     : 0;
 
   const elapsedDays = startDate > today ? 0 : daysBetween(startDate, today);
-  let zeroTargetDate: string | null = null;
-  for (let week = 0; week <= 52; week++) {
-    const date = addDays(startDate, week * 7);
-    if (getGradualTargetForDate(profile, date) === 0) {
-      zeroTargetDate = date;
-      break;
-    }
-  }
+  const zeroTargetDate = getGradualZeroDate(profile);
 
   const byDate = new Map(entries.map((s) => [s.date, s]));
   const last7Days: GradualDay[] = [];

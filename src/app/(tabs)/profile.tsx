@@ -11,11 +11,12 @@ import { useAchievementStore } from '@/store/achievementStore';
 import { ACHIEVEMENTS } from '@/constants/achievements';
 import { storage } from '@/utils/storage';
 import { getDateString, getQuitTimestamp, getTodayString, toDateKey } from '@/utils/dateHelpers';
-import { getCurrentGradualTarget, getTrackingStartDate } from '@/utils/gradualHelpers';
+import { getCurrentGradualTarget, getGradualZeroDate, getTrackingStartDate } from '@/utils/gradualHelpers';
 import { getAchievementProgress, isAchievementAvailable } from '@/utils/progressMetrics';
 import { EditValueModal } from '@/components/EditValueModal';
 import { Smoof } from '@/components/smoof/Smoof';
 import { SKINS } from '@/components/smoof/palette';
+import { newDate, useClockStore } from '@/utils/clock';
 
 type EditField = 'packPrice' | 'perPack' | 'target' | null;
 
@@ -58,6 +59,9 @@ export default function ProfileScreen() {
   const syncStreaks = useStatsStore((s) => s.syncStreaks);
   const unlockedIds = useAchievementStore((s) => s.unlockedAchievements);
   const resetAchievements = useAchievementStore((s) => s.resetAchievements);
+
+  const offsetDays = useClockStore((s) => s.offsetDays);
+  const setOffsetDays = useClockStore((s) => s.setOffsetDays);
 
   const [testModeVisible, setTestModeVisible] = useState(false);
   const [testTapCount, setTestTapCount] = useState(0);
@@ -110,7 +114,7 @@ export default function ProfileScreen() {
   };
 
   const handleDateTest = async (daysAgo: number) => {
-    const testDate = new Date();
+    const testDate = newDate();
     testDate.setDate(testDate.getDate() - daysAgo); // negative = future
     const newQuitDate = getDateString(testDate);
 
@@ -119,7 +123,7 @@ export default function ProfileScreen() {
     syncStreaks(useUserStore.getState().profile);
 
     const planInfo = isGradual
-      ? `\nPlan: ${profile.gradualTargetWeeks ?? '-'} hafta, haftada -${profile.gradualWeeklyReduction ?? 0} sigara\nTakvimde ${newQuitDate} tarihinden itibaren giriş yapabilirsin`
+      ? `\nPlan: ${profile.gradualTargetWeeks ?? '-'} hafta, ilk sigarasız gün ${getGradualZeroDate(useUserStore.getState().profile!) ?? '-'}\nTakvimde ${newQuitDate} tarihinden itibaren giriş yapabilirsin`
       : '';
     Alert.alert(
       'Tarih Güncellendi',
@@ -143,12 +147,22 @@ export default function ProfileScreen() {
             await clearStatsData();
             await resetAchievements();
             await storage.clear();
+            await setOffsetDays(0);
             router.replace('/onboarding');
           },
         },
       ],
     );
   };
+
+  // Time travel: shift the app clock, so the app behaves as if it is opened N days later
+  const handleTimeTravel = async (days: number) => {
+    await setOffsetDays(days === 0 ? 0 : offsetDays + days);
+  };
+
+  const simulatedDayLabel = newDate().toLocaleDateString('tr-TR', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  });
 
   const showFreezeInfo = () => {
     Alert.alert(
@@ -257,9 +271,20 @@ export default function ProfileScreen() {
               icon="flag"
               iconColor={colors.accent}
               label="Bugünkü hedef (sadece azaltılabilir)"
-              value={`${currentTarget} sigara · haftada -${profile.gradualWeeklyReduction ?? 0}`}
+              value={`${currentTarget} sigara`}
               onPress={() => setEditing('target')}
             />
+            <Divider />
+            <TouchableOpacity style={styles.infoRow} onPress={() => router.push('/plan')}>
+              <View style={[styles.infoIcon, { backgroundColor: colors.primary + '18' }]}>
+                <Ionicons name="map" size={18} color={colors.primary} />
+              </View>
+              <View style={styles.infoText}>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Haftalık limitler, sigarasız gün</Text>
+                <Text style={[styles.infoValue, { color: colors.text }]}>Yol haritam</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </TouchableOpacity>
           </>
         )}
         <Divider />
@@ -319,6 +344,34 @@ export default function ProfileScreen() {
           </View>
 
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+            <Text style={[styles.testCardTitle, { color: colors.text }]}>Zaman yolculuğu ⏩</Text>
+            <Text style={[styles.testHint, { color: colors.textSecondary }]}>
+              Uygulama bugünü {simulatedDayLabel} olarak görüyor
+              {offsetDays > 0 ? ` (gerçek tarihten +${offsetDays} gün)` : ' (gerçek tarih)'}.
+              Gün atladıkça kayıtların kendi günlerinde kalır; gerçek bir kullanıcı gibi ilerlersin.
+            </Text>
+            <View style={styles.testGrid}>
+              {([[1, '+1 Gün'], [7, '+1 Hafta'], [30, '+1 Ay']] as const).map(([days, label]) => (
+                <TouchableOpacity
+                  key={days}
+                  style={[styles.testButton, { backgroundColor: colors.primary }]}
+                  onPress={() => handleTimeTravel(days)}
+                >
+                  <Text style={styles.testButtonText}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+              {offsetDays > 0 && (
+                <TouchableOpacity
+                  style={[styles.testButton, { backgroundColor: colors.textSecondary }]}
+                  onPress={() => handleTimeTravel(0)}
+                >
+                  <Text style={styles.testButtonText}>Gerçek tarihe dön</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
             <Text style={[styles.testCardTitle, { color: colors.text }]}>Geçmiş başlangıç</Text>
             <View style={styles.testGrid}>
               {([
@@ -355,6 +408,7 @@ export default function ProfileScreen() {
             <Text style={[styles.testCardTitle, { color: colors.text }]}>Debug</Text>
             {[
               ['Bugün', getTodayString()],
+              ['Zaman kayması', `+${offsetDays} gün`],
               ['quitDate', profile.quitDate],
               ...(isGradual ? [['gradualStartDate', profile.gradualStartDate ?? '-']] : []),
               [isGradual ? 'Disiplin serisi' : 'Seri', `${currentStreak} gün`],
@@ -405,12 +459,14 @@ export default function ProfileScreen() {
           visible={editing === 'target'}
           icon="flag"
           title="Günlük hedef"
-          message={`Şu anki hedefin ${currentTarget} sigara. Hedefi sadece azaltabilirsin; plan haftalık azalmaya devam eder.`}
+          message={`Şu anki hedefin ${currentTarget} sigara. Hedefi sadece azaltabilirsin; plan yeni hedefinden aynı bitiş tarihine kadar haftalık azalmaya devam eder.`}
           initialValue={currentTarget}
           suffix="sigara"
           validate={(v) => (v > currentTarget ? `Hedef ${currentTarget} sigaradan yüksek olamaz.` : null)}
           onSubmit={async (v) => {
-            await updateProfile({ gradualCurrentTarget: v });
+            const today = getTodayString();
+            const changes = (profile.gradualTargetChanges ?? []).filter((c) => c.from !== today);
+            await updateProfile({ gradualTargetChanges: [...changes, { from: today, target: v }] });
             setEditing(null);
             if (v === 0) Alert.alert('🎉 Hedef 0!', 'Artık hedefin tamamen sigarasız günler.');
           }}
@@ -619,6 +675,12 @@ const styles = StyleSheet.create({
   testCardTitle: {
     fontSize: 14,
     fontWeight: '700',
+    marginBottom: 10,
+  },
+  testHint: {
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: -4,
     marginBottom: 10,
   },
   testGrid: {

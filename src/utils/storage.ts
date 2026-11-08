@@ -49,4 +49,5 @@ export const STORAGE_KEYS = {
   ONBOARDING_COMPLETED: '@smoof:onboarding_completed',
   NOTIFICATION_SETTINGS: '@smoof:notification_settings',
   ACHIEVEMENTS: '@smoof:achievements',
+  DEBUG_DAY_OFFSET: '@smoof:debug_day_offset',
 } as const;

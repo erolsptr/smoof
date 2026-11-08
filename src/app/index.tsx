@@ -3,6 +3,7 @@ import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useUserStore } from '@/store/userStore';
 import { useStatsStore } from '@/store/statsStore';
+import { useClockStore } from '@/utils/clock';
 import { Smoof } from '@/components/smoof/Smoof';
 
 // Loading screen colors (fixed, so it looks the same in light and dark mode)
@@ -28,6 +29,7 @@ export default function IndexScreen() {
       await Promise.all([
         loadUserData(),
         loadStatsData(),
+        useClockStore.getState().loadClock(),
         new Promise((resolve) => setTimeout(resolve, MIN_SPLASH_MS)),
       ]);
 

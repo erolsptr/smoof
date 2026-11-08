@@ -10,6 +10,7 @@ import {
   getImmediateMetrics,
 } from '@/utils/progressMetrics';
 import { getTodayString, toDateKey } from '@/utils/dateHelpers';
+import { now as clockNow, useClockStore } from '@/utils/clock';
 
 const MINUTES_PER_DAY = 24 * 60;
 
@@ -23,11 +24,16 @@ export function useProgress() {
   const crisisLogs = useStatsStore((s) => s.crisisLogs);
   const storeStreak = useStatsStore((s) => s.currentStreak);
 
-  const [now, setNow] = useState(() => Date.now());
+  const offsetDays = useClockStore((s) => s.offsetDays);
+
+  const [tick, setTick] = useState(0);
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 30000);
+    const id = setInterval(() => setTick((t) => t + 1), 30000);
     return () => clearInterval(id);
   }, []);
+  // Re-read the clock on each tick and when the test mode jumps days
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const now = useMemo(() => clockNow(), [tick, offsetDays]);
 
   return useMemo(() => {
     const isGradual = profile?.quitMethod === 'gradual';
