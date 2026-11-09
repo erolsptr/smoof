@@ -12,7 +12,7 @@ import { ACHIEVEMENTS } from '@/constants/achievements';
 import { storage } from '@/utils/storage';
 import { getDateString, getQuitTimestamp, getTodayString, toDateKey } from '@/utils/dateHelpers';
 import { getActivePlan, getCurrentGradualTarget, getGradualZeroDate, getTrackingStartDate } from '@/utils/gradualHelpers';
-import { getAchievementProgress, isAchievementAvailable } from '@/utils/progressMetrics';
+import { getAchievementProgress, isAchievementVisible } from '@/utils/progressMetrics';
 import { EditValueModal } from '@/components/EditValueModal';
 import { Smoof } from '@/components/smoof/Smoof';
 import { SKINS } from '@/components/smoof/palette';
@@ -73,7 +73,7 @@ export default function ProfileScreen() {
   }
 
   // ── Badges summary ──────────────────────────────
-  const available = ACHIEVEMENTS.filter((a) => isAchievementAvailable(a, isGradual));
+  const available = ACHIEVEMENTS.filter((a) => isAchievementVisible(a, isGradual, unlockedIds));
   const earned = unlockedIds
     .map((id) => available.find((a) => a.id === id))
     .filter((a): a is (typeof available)[number] => a !== undefined);
@@ -264,6 +264,15 @@ export default function ProfileScreen() {
           iconColor={colors.secondary}
           label="Başlamadan önce günde"
           value={`${isGradual ? (profile.gradualStartCount || profile.dailyCigaretteCount) : profile.dailyCigaretteCount} sigara`}
+        />
+        <Divider />
+        <InfoRow
+          icon={isGradual ? 'trending-down' : 'flash'}
+          iconColor={colors.primary}
+          label="Bırakma yöntemi"
+          value={isGradual ? 'Kademeli azaltma' : 'Hemen bırakma'}
+          onPress={() => router.push('/change-method')}
+          right={<Text style={[styles.changeLink, { color: colors.primary }]}>Değiştir</Text>}
         />
         {isGradual && (
           <>
@@ -497,6 +506,10 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  changeLink: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
   container: {
     flex: 1,
   },

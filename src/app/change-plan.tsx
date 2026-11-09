@@ -169,6 +169,11 @@ export default function ChangePlanScreen() {
           );
         })}
 
+        <TouchableOpacity style={styles.methodLink} onPress={() => router.push('/change-method')}>
+          <Ionicons name="flash" size={16} color={colors.primary} />
+          <Text style={[styles.methodLinkText, { color: colors.primary }]}>Tamamen bırakmaya hazır mısın? Hemen bırakmaya geç</Text>
+        </TouchableOpacity>
+
         <View style={[styles.note, { backgroundColor: colors.primary + '12' }]}>
           <Ionicons name="information-circle" size={18} color={colors.primary} />
           <Text style={[styles.noteText, { color: colors.text }]}>
@@ -230,6 +235,8 @@ const styles = StyleSheet.create({
   optionTitle: { fontSize: 16, fontWeight: '700' },
   optionText: { fontSize: 13, marginTop: 2 },
 
+  methodLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 6 },
+  methodLinkText: { fontSize: 14, fontWeight: '700' },
   note: { flexDirection: 'row', gap: 8, padding: 12, borderRadius: 14, alignItems: 'flex-start' },
   noteText: { flex: 1, fontSize: 13, lineHeight: 18 },
 

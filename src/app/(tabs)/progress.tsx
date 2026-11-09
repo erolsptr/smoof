@@ -8,7 +8,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { useProgress } from '@/hooks/useProgress';
 import { useAchievementStore } from '@/store/achievementStore';
 import { ACHIEVEMENTS } from '@/constants/achievements';
-import { isAchievementAvailable, MINUTES_PER_CIGARETTE } from '@/utils/progressMetrics';
+import { isAchievementVisible, MINUTES_PER_CIGARETTE } from '@/utils/progressMetrics';
 import { formatDuration } from '@/utils/milestones';
 import { daysBetween, getQuitTimestamp, getTodayString, parseDateKey, toDateKey } from '@/utils/dateHelpers';
 import { HealthTimeline } from '@/components/stats/HealthTimeline';
@@ -87,7 +87,7 @@ export default function ProgressScreen() {
     return <View style={[styles.container, { backgroundColor: colors.background }]} />;
   }
 
-  const availableBadges = ACHIEVEMENTS.filter((a) => isAchievementAvailable(a, isGradual));
+  const availableBadges = ACHIEVEMENTS.filter((a) => isAchievementVisible(a, isGradual, unlockedIds));
   const earnedBadges = availableBadges.filter((a) => unlockedIds.includes(a.id)).length;
   const todayKey = getTodayString();
   const startKey = isGradual && gradual ? gradual.startDate : toDateKey(profile.quitDate);

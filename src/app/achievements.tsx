@@ -4,7 +4,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { useAchievementStore } from '@/store/achievementStore';
 import { useProgress } from '@/hooks/useProgress';
 import { ACHIEVEMENTS } from '@/constants/achievements';
-import { getAchievementProgress, isAchievementAvailable } from '@/utils/progressMetrics';
+import { getAchievementProgress, isAchievementVisible } from '@/utils/progressMetrics';
 import { Spacing, Typography, BorderRadius } from '@/constants';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
@@ -24,7 +24,7 @@ export default function AchievementsScreen() {
   }, [loadAchievements]);
 
   // Gradual-only badges are hidden for immediate quitters (they can never earn them)
-  const available = ACHIEVEMENTS.filter((a) => isAchievementAvailable(a, isGradual));
+  const available = ACHIEVEMENTS.filter((a) => isAchievementVisible(a, isGradual, unlockedIds));
   const unlockedAchievements = available.filter((a) => unlockedIds.includes(a.id));
   const lockedAchievements = available.filter((a) => !unlockedIds.includes(a.id));
   
@@ -254,7 +254,7 @@ export default function AchievementsScreen() {
           </Text>
         </TouchableOpacity>
 
-        {isGradual && (
+        {available.some((a) => a.category === 'gradual') && (
         <TouchableOpacity
           style={[
             styles.filterTab,

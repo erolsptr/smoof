@@ -293,6 +293,11 @@ export function isAchievementAvailable(achievement: Achievement, isGradual: bool
   return achievement.category !== 'gradual' || isGradual;
 }
 
+/** Badges to list: the ones the user can earn, plus any already earned (kept after a method change) */
+export function isAchievementVisible(achievement: Achievement, isGradual: boolean, unlockedIds: string[]): boolean {
+  return isAchievementAvailable(achievement, isGradual) || unlockedIds.includes(achievement.id);
+}
+
 /** Current value and goal, in the same unit */
 function getAchievementValue(a: Achievement, ctx: AchievementContext): { value: number; goal: number } {
   switch (a.category) {
