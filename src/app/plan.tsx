@@ -6,10 +6,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useProgress } from '@/hooks/useProgress';
 import { daysBetween, getTodayString, parseDateKey } from '@/utils/dateHelpers';
-import { getGradualPlanInputs, getGradualSchedule, type GradualPlanStep } from '@/utils/gradualHelpers';
-import { describeWeeklyPace } from '@/utils/gradualPlan';
+import { getActivePlan, getGradualPlanInputs, getGradualSchedule, getGradualTargetForDate, type GradualPlanStep } from '@/utils/gradualHelpers';
+import { PLAN_NAMES, describeWeeklyPace } from '@/utils/gradualPlan';
 
-const PLAN_NAMES: Record<number, string> = { 4: 'Hızlı', 6: 'Dengeli', 8: 'Rahat', 12: 'Çok Rahat' };
 
 function formatDay(dateKey: string, withWeekday = false): string {
   return parseDateKey(dateKey).toLocaleDateString('tr-TR', {
@@ -67,11 +66,16 @@ export default function PlanScreen() {
   }
 
   const today = getTodayString();
-  const { startDate, startCount, initialTarget, totalWeeks } = getGradualPlanInputs(profile);
+  const { startDate, startCount, initialTarget } = getGradualPlanInputs(profile);
+  // The plan choice in effect today (may differ from onboarding after a plan change)
+  const activePlan = getActivePlan(profile, today < startDate ? startDate : today);
+  const planStartTarget = activePlan.isChanged ? getGradualTargetForDate(profile, activePlan.since) : initialTarget;
   const steps = getGradualSchedule(profile);
   const zeroStep = steps[steps.length - 1];
   const zeroDate = zeroStep.from;
-  const changeDays = new Set((profile.gradualTargetChanges ?? []).map((c) => c.from));
+  const changes = profile.gradualTargetChanges ?? [];
+  const targetChangeDays = new Set(changes.filter((c) => !c.weeks).map((c) => c.from));
+  const planChangeDays = new Set(changes.filter((c) => c.weeks).map((c) => c.from));
 
   const notStarted = today < startDate;
   const done = today >= zeroDate;
@@ -84,7 +88,7 @@ export default function PlanScreen() {
   const progress = elapsed / totalDays;
   const daysToZero = done ? 0 : daysBetween(today, zeroDate);
 
-  const planName = PLAN_NAMES[totalWeeks];
+  const planName = PLAN_NAMES[activePlan.weeks];
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -100,7 +104,7 @@ export default function PlanScreen() {
           <View style={styles.heroChip}>
             <Ionicons name="trending-down" size={14} color="#FFF" />
             <Text style={styles.heroChipText}>
-              {planName ? `${planName} plan · ` : ''}{totalWeeks} hafta
+              {planName ? `${planName} plan · ` : ''}{activePlan.weeks} hafta
             </Text>
           </View>
 
@@ -150,7 +154,7 @@ export default function PlanScreen() {
         <View style={[styles.paceBox, { backgroundColor: colors.primary + '14' }]}>
           <Ionicons name="information-circle" size={18} color={colors.primary} />
           <Text style={[styles.paceText, { color: colors.text }]}>
-            {describeWeeklyPace(initialTarget, totalWeeks)}. Limit her hafta {parseDateKey(startDate).toLocaleDateString('tr-TR', { weekday: 'long' })} günü otomatik düşer.
+            {describeWeeklyPace(planStartTarget, activePlan.weeks)}. Limit her hafta {parseDateKey(activePlan.anchor).toLocaleDateString('tr-TR', { weekday: 'long' })} günü otomatik düşer.
           </Text>
         </View>
 
@@ -165,7 +169,8 @@ export default function PlanScreen() {
             const drop = prev ? prev.target - step.target : startCount - step.target;
             const barPct = startCount > 0 ? (step.target / startCount) * 100 : 0;
             const dotColor = isZero ? colors.success : isCurrent ? colors.primary : isPast ? colors.textTertiary : colors.cardBorder;
-            const changed = changeDays.has(step.from);
+            const targetChanged = targetChangeDays.has(step.from);
+            const planChanged = planChangeDays.has(step.from);
 
             return (
               <View key={step.from} style={styles.stepRow}>
@@ -189,16 +194,21 @@ export default function PlanScreen() {
                 >
                   <View style={styles.stepTop}>
                     <Text style={[styles.stepWeek, { color: isPast ? colors.textTertiary : colors.text }]}>
-                      {isZero ? 'Sigarasız 🎉' : `${step.week}. hafta`}
+                      {isZero ? 'Sigarasız 🎉' : step.toWeek > step.week ? `${step.week}–${step.toWeek}. hafta` : `${step.week}. hafta`}
                     </Text>
                     {isCurrent && (
                       <View style={[styles.tag, { backgroundColor: colors.primary }]}>
                         <Text style={styles.tagText}>{isZero ? 'Şimdi' : 'Bu hafta'}</Text>
                       </View>
                     )}
-                    {changed && (
+                    {targetChanged && (
                       <View style={[styles.tag, { backgroundColor: colors.accent }]}>
                         <Text style={styles.tagText}>Hedef düşürüldü</Text>
+                      </View>
+                    )}
+                    {planChanged && (
+                      <View style={[styles.tag, { backgroundColor: colors.secondary }]}>
+                        <Text style={styles.tagText}>Plan değişti</Text>
                       </View>
                     )}
                     <View style={{ flex: 1 }} />
@@ -237,8 +247,18 @@ export default function PlanScreen() {
           })}
         </View>
 
+        {!done && (
+          <TouchableOpacity
+            style={[styles.changeButton, { borderColor: colors.primary }]}
+            onPress={() => router.push('/change-plan')}
+          >
+            <Ionicons name="swap-vertical" size={18} color={colors.primary} />
+            <Text style={[styles.changeButtonText, { color: colors.primary }]}>Planı değiştir</Text>
+          </TouchableOpacity>
+        )}
+
         <Text style={[styles.footnote, { color: colors.textTertiary }]}>
-          Hedefini profilden istediğin zaman düşürebilirsin; plan yeni hedefinden aynı bitiş tarihine kadar yeniden hesaplanır.
+          Plan çok hızlı ya da yavaş gelirse süresini değiştirebilirsin. Değişiklik o günden itibaren geçerli olur; geçmiş günlerin limitleri ve girişlerin değişmez.
         </Text>
       </ScrollView>
     </View>
@@ -323,5 +343,15 @@ const styles = StyleSheet.create({
   stepUnit: { fontSize: 12, fontWeight: '500' },
   zeroText: { fontSize: 13, marginTop: 6 },
 
+  changeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+  },
+  changeButtonText: { fontSize: 15, fontWeight: '700' },
   footnote: { fontSize: 12, lineHeight: 17, textAlign: 'center', paddingHorizontal: 12 },
 });

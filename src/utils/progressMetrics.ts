@@ -200,7 +200,8 @@ export function getGradualMetrics(profile: UserProfile, dailyStats: DailyStats[]
     startDate,
     todayTarget: getGradualTargetForDate(profile, today),
     currentWeek: Math.floor(elapsedDays / 7) + 1,
-    totalWeeks: profile.gradualTargetWeeks || 6,
+    // Weeks from the start to the first 0 day (plan changes can make it longer or shorter)
+    totalWeeks: Math.max(1, Math.ceil(daysBetween(startDate, zeroTargetDate ?? startDate) / 7)),
     zeroTargetDate,
     loggedDays: entries.length,
     goalDays,
@@ -218,7 +219,7 @@ export function getGradualMetrics(profile: UserProfile, dailyStats: DailyStats[]
 }
 
 /**
- * Gradual streaks, counted on consecutive calendar days going back from today.
+ * Gradual streaks, counted on logged days going back from today (unlogged days are skipped).
  * Today counts only once it's logged (the day isn't over yet); an unlogged past
  * day breaks the streak.
  */
@@ -230,14 +231,22 @@ export function computeGradualStreaks(
   const startDate = getTrackingStartDate(profile);
   const byDate = new Map(dailyStats.map((s) => [s.date, s]));
 
+  // A streak only grows over an unbroken run of logged days.
+  // - Today not logged yet: fine, the day isn't over.
+  // - A missing past day (gap): we don't know if it met the goal, so the days
+  //   after it are on hold (not counted) and the streak stays where it was
+  //   before the gap. Once the gap is filled they all count together.
+  // - A logged day that misses the goal ends the streak.
   const count = (passes: (stat: DailyStats, date: string) => boolean) => {
     let streak = 0;
-    let date = byDate.has(today) ? today : addDays(today, -1);
-    while (date >= startDate) {
+    for (let date = today; date >= startDate; date = addDays(date, -1)) {
       const stat = byDate.get(date);
-      if (!stat || !passes(stat, date)) break;
+      if (!stat) {
+        if (date !== today) streak = 0; // gap: drop the unconfirmed days after it
+        continue;
+      }
+      if (!passes(stat, date)) break;
       streak++;
-      date = addDays(date, -1);
     }
     return streak;
   };

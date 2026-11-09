@@ -5,8 +5,8 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { useStatsStore } from '@/store/statsStore';
 import { useProgress } from '@/hooks/useProgress';
 import { addDays, daysBetween, getQuitTimestamp, getTodayString, parseDateKey, toDateKey } from '@/utils/dateHelpers';
-import { getCurrentGradualTarget, getGradualSchedule, getGradualTargetForDate } from '@/utils/gradualHelpers';
-import { MonthCalendar, countUnloggedDays } from '@/components/MonthCalendar';
+import { getActivePlan, getCurrentGradualTarget, getGradualSchedule, getGradualTargetForDate } from '@/utils/gradualHelpers';
+import { MonthCalendar, getUnloggedDays } from '@/components/MonthCalendar';
 import { CravingCard } from '@/components/CravingCard';
 import { FreezeBadge } from '@/components/FreezeBadge';
 import { HEALTH_MILESTONES, formatDuration, getNextHealthMilestone, getNextStreakMilestone } from '@/utils/milestones';
@@ -170,7 +170,7 @@ export default function HomeScreen() {
     });
 
     const planRows = isGradual
-      ? Array.from({ length: Math.min(profile.gradualTargetWeeks || 6, 6) }).map((_, week) => {
+      ? Array.from({ length: Math.min(getActivePlan(profile, quitDayKey).weeks, 6) }).map((_, week) => {
           const weekTarget = getGradualTargetForDate(profile, addDays(quitDayKey, week * 7));
           return {
             key: `w${week}`,
@@ -231,7 +231,7 @@ export default function HomeScreen() {
           {renderListCard(
             'sparkles',
             colors.secondary,
-            isGradual ? `Planın · ${profile.gradualTargetWeeks || 6} hafta` : 'Seni neler bekliyor',
+            isGradual ? `Planın · ${getActivePlan(profile, quitDayKey).weeks} hafta` : 'Seni neler bekliyor',
             planRows,
           )}
           {isGradual && (
@@ -256,7 +256,8 @@ export default function HomeScreen() {
   // ─────────────────────────────────────────────
   if (profile && isGradual) {
     const target = getCurrentGradualTarget(profile);
-    const unloggedDays = countUnloggedDays(profile, dailyStats);
+    const missingDays = getUnloggedDays(profile, dailyStats);
+    const unloggedDays = missingDays.length;
     // Smoof reacts to today's entry: a bit sad *with* you when over target
     const todayEntry = gradualMetrics?.last7Days.find((d) => d.date === getTodayString());
     const gradualMood: SmoofMood = todayEntry?.metGoal === false ? 'supportive' : todayEntry?.smoked === 0 ? 'proud' : 'happy';
@@ -351,6 +352,28 @@ export default function HomeScreen() {
         {/* Craving help - the place to tap when a craving hits */}
         <CravingCard />
 
+        {/* Missing days: streaks wait for these, so make filling them one tap */}
+        {unloggedDays > 0 && (
+          <TouchableOpacity
+            style={[styles.missingCard, { backgroundColor: colors.secondary + '18', borderColor: colors.secondary + '50' }]}
+            onPress={() => router.push(`/daily-logger?date=${missingDays[0]}&flow=missing`)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.planCardIcon, { backgroundColor: colors.secondary }]}>
+              <Ionicons name="calendar" size={20} color="#FFF" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.planCardTitle, { color: colors.text }]}>
+                {unloggedDays === 1 ? '1 eksik gün var' : `${unloggedDays} eksik gün var`}
+              </Text>
+              <Text style={[styles.planCardText, { color: colors.textSecondary }]}>
+                Serilerin {parseDateKey(missingDays[0]).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} gününü bekliyor · Sırayla gir
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+        )}
+
         {/* Calendar */}
         <View style={[styles.calendarCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
           <MonthCalendar
@@ -359,9 +382,7 @@ export default function HomeScreen() {
             onDayPress={(date) => router.push(`/daily-logger?date=${date}`)}
           />
           <Text style={[styles.calendarHint, { color: colors.textTertiary }]}>
-            {unloggedDays > 0
-              ? `${unloggedDays} gün henüz girilmedi · Güne dokunarak ekleyebilirsin`
-              : 'Bir güne dokunarak içtiğin sigara sayısını girebilirsin'}
+            Bir güne dokunarak içtiğin sigara sayısını girebilirsin
           </Text>
         </View>
       </ScrollView>
@@ -548,6 +569,15 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   planCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  missingCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,

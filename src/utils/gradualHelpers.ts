@@ -29,32 +29,81 @@ export function getGradualPlanInputs(profile: UserProfile) {
   };
 }
 
+function weekIndex(anchorKey: string, dateKey: string): number {
+  return Math.floor(Math.max(0, dayIndex(anchorKey, dateKey)) / 7);
+}
+
+/**
+ * One linear piece of the plan: from `fromTarget` in week `fromWeek`
+ * (weeks counted from `anchor`) down to 0 after `totalWeeks` weeks.
+ */
+interface PlanSegment {
+  anchor: string;
+  fromWeek: number;
+  fromTarget: number;
+  totalWeeks: number;
+}
+
+/**
+ * Plan segments in effect on a day. Changes are applied in date order:
+ * - plan change (has `weeks`): a fresh plan from that day, from the limit of
+ *   that day to 0 in `weeks` weeks (weeks counted from the change day)
+ * - target change: re-plans from the new limit to the same end date
+ * Changes after `dateKey` are ignored, so past days keep their limits.
+ */
+function getPlanSegments(profile: UserProfile, dateKey: string): PlanSegment[] {
+  const { startDate, initialTarget, totalWeeks } = getGradualPlanInputs(profile);
+  let segments: PlanSegment[] = [{ anchor: startDate, fromWeek: 0, fromTarget: initialTarget, totalWeeks }];
+
+  const changes = (profile.gradualTargetChanges ?? [])
+    .filter((c) => c.from <= dateKey)
+    .sort((a, b) => a.from.localeCompare(b.from));
+
+  for (const change of changes) {
+    if (change.weeks) {
+      segments = [{ anchor: change.from, fromWeek: 0, fromTarget: change.target, totalWeeks: change.weeks }];
+    } else {
+      const base = segments[0];
+      segments.push({
+        anchor: base.anchor,
+        fromWeek: weekIndex(base.anchor, change.from),
+        fromTarget: change.target,
+        totalWeeks: base.totalWeeks,
+      });
+    }
+  }
+  return segments;
+}
+
 /**
  * Belirli bir gün (YYYY-MM-DD, yerel) için günlük sigara limiti.
  * Plan: 1. hafta ilk hedef, her hafta eşit azalır, seçilen hafta sayısı dolunca 0.
- * Kullanıcı hedefi elle düşürdüyse o günden itibaren yeni hedeften aynı bitiş
- * tarihine kadar yeniden planlanır (geçmiş günler değişmez).
+ * Hedef düşürülürse ya da plan süresi değiştirilirse o günden itibaren yeniden
+ * planlanır; geçmiş günlerin limitleri değişmez.
  */
 export function getGradualTargetForDate(profile: UserProfile, dateKey: string): number {
   if (profile.quitMethod !== 'gradual' || !profile.gradualStartDate) {
     return 0;
   }
+  // Each segment only lowers the limit (a manual target change never raises it)
+  return Math.min(
+    ...getPlanSegments(profile, dateKey).map((seg) =>
+      linearWeekTarget(seg.fromTarget, seg.fromWeek, seg.totalWeeks, weekIndex(seg.anchor, dateKey)),
+    ),
+  );
+}
 
-  const { startDate, initialTarget, totalWeeks } = getGradualPlanInputs(profile);
-  const week = Math.floor(Math.max(0, dayIndex(startDate, dateKey)) / 7);
-  let target = linearWeekTarget(initialTarget, 0, totalWeeks, week);
-
-  // Latest manual change that is already in effect on this day
-  const change = (profile.gradualTargetChanges ?? [])
-    .filter((c) => c.from <= dateKey)
-    .sort((a, b) => a.from.localeCompare(b.from))
-    .pop();
-  if (change) {
-    const changeWeek = Math.floor(Math.max(0, dayIndex(startDate, change.from)) / 7);
-    target = Math.min(target, linearWeekTarget(change.target, changeWeek, totalWeeks, week));
-  }
-
-  return target;
+/** The plan choice in effect on a day: duration in weeks and the day it was chosen */
+export function getActivePlan(profile: UserProfile, dateKey: string = getTodayString()) {
+  const base = getPlanSegments(profile, dateKey)[0];
+  return {
+    /** Weeks chosen (4, 6, 8, 12), counted from `since` */
+    weeks: base.totalWeeks,
+    since: base.anchor,
+    /** Limits drop on this weekday */
+    anchor: base.anchor,
+    isChanged: base.anchor !== getGradualPlanInputs(profile).startDate,
+  };
 }
 
 /**
@@ -68,17 +117,25 @@ export function getCurrentGradualTarget(profile: UserProfile): number {
 export function getGradualZeroDate(profile: UserProfile): string | null {
   if (profile.quitMethod !== 'gradual' || !profile.gradualStartDate) return null;
   const { startDate, totalWeeks } = getGradualPlanInputs(profile);
-  // Changes can only lower the limit, so 0 is reached by the planned end at the latest
-  for (let i = 0; i <= totalWeeks * 7; i++) {
-    const date = addDays(startDate, i);
+  // Latest possible end: the original plan or any later plan change
+  let end = addDays(startDate, totalWeeks * 7);
+  for (const c of profile.gradualTargetChanges ?? []) {
+    if (c.weeks) {
+      const changeEnd = addDays(c.from, c.weeks * 7);
+      if (changeEnd > end) end = changeEnd;
+    }
+  }
+  for (let date = startDate; date < end; date = addDays(date, 1)) {
     if (getGradualTargetForDate(profile, date) === 0) return date;
   }
-  return addDays(startDate, totalWeeks * 7);
+  return end;
 }
 
 export interface GradualPlanStep {
   /** 1-based plan week of the first day */
   week: number;
+  /** 1-based plan week of the last day (same as `week` unless the limit spans weeks) */
+  toWeek: number;
   from: string;
   /** Last day with this limit (null for the final 0 step: it lasts forever) */
   to: string | null;
@@ -98,13 +155,16 @@ export function getGradualSchedule(profile: UserProfile): GradualPlanStep[] {
   for (let date = startDate; date < zeroDate; date = addDays(date, 1)) {
     const target = getGradualTargetForDate(profile, date);
     const last = steps[steps.length - 1];
+    const week = Math.floor(dayIndex(startDate, date) / 7) + 1;
     if (last && last.target === target) {
       last.to = date;
+      last.toWeek = week;
     } else {
-      steps.push({ week: Math.floor(dayIndex(startDate, date) / 7) + 1, from: date, to: date, target });
+      steps.push({ week, toWeek: week, from: date, to: date, target });
     }
   }
-  steps.push({ week: Math.floor(dayIndex(startDate, zeroDate) / 7) + 1, from: zeroDate, to: null, target: 0 });
+  const zeroWeek = Math.floor(dayIndex(startDate, zeroDate) / 7) + 1;
+  steps.push({ week: zeroWeek, toWeek: zeroWeek, from: zeroDate, to: null, target: 0 });
   return steps;
 }
 

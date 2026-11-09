@@ -208,8 +208,8 @@ export default function ProgressScreen() {
 
         {/* Last 7 days */}
         {gradual.last7Days.length > 0 && (
-          <Section title="Son 7 gün" subtitle="Bir çubuğa dokunarak o günü düzenleyebilirsin">
-            <WeekBarChart days={gradual.last7Days} onDayPress={(date) => router.push(`/daily-logger?date=${date}`)} />
+          <Section title="Son 7 gün" subtitle="Günleri ana sayfadaki takvimden girebilirsin">
+            <WeekBarChart days={gradual.last7Days} />
           </Section>
         )}
 

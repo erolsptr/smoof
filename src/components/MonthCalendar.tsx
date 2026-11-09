@@ -212,24 +212,29 @@ function LegendItem({ color, label, textColor }: { color: string; label: string;
 }
 
 /**
- * Number of loggable days (start date .. yesterday) with no entry.
+ * Loggable days (start date .. yesterday) with no entry, oldest first.
  * Today is excluded because the day isn't over yet.
  */
-export function countUnloggedDays(profile: UserProfile, dailyStats: DailyStats[]): number {
+export function getUnloggedDays(profile: UserProfile, dailyStats: DailyStats[]): string[] {
   const startDate = getTrackingStartDate(profile);
   const today = getTodayString();
   const logged = new Set(dailyStats.map((s) => s.date));
 
-  let missing = 0;
+  const missing: string[] = [];
   const cursor = parseDateKey(startDate);
   // Safety cap (~5 years) so a bad start date can't loop forever
   for (let i = 0; i < 2000; i++) {
     const key = getDateString(cursor);
     if (key >= today) break;
-    if (!logged.has(key)) missing++;
+    if (!logged.has(key)) missing.push(key);
     cursor.setDate(cursor.getDate() + 1);
   }
   return missing;
+}
+
+/** Number of loggable days with no entry */
+export function countUnloggedDays(profile: UserProfile, dailyStats: DailyStats[]): number {
+  return getUnloggedDays(profile, dailyStats).length;
 }
 
 const CELL_WIDTH = `${100 / 7}%` as const;

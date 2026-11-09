@@ -11,6 +11,9 @@
  * and the limit never goes up.
  */
 
+/** Plan choices (weeks until 0) and their names */
+export const PLAN_NAMES: Record<number, string> = { 4: 'Hızlı', 6: 'Dengeli', 8: 'Rahat', 12: 'Çok Rahat' };
+
 /** Daily limit for a week, linear from `fromTarget` (at `fromWeek`) to 0 at `totalWeeks` */
 export function linearWeekTarget(
   fromTarget: number,

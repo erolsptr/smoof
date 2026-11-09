@@ -11,12 +11,13 @@ import { useAchievementStore } from '@/store/achievementStore';
 import { ACHIEVEMENTS } from '@/constants/achievements';
 import { storage } from '@/utils/storage';
 import { getDateString, getQuitTimestamp, getTodayString, toDateKey } from '@/utils/dateHelpers';
-import { getCurrentGradualTarget, getGradualZeroDate, getTrackingStartDate } from '@/utils/gradualHelpers';
+import { getActivePlan, getCurrentGradualTarget, getGradualZeroDate, getTrackingStartDate } from '@/utils/gradualHelpers';
 import { getAchievementProgress, isAchievementAvailable } from '@/utils/progressMetrics';
 import { EditValueModal } from '@/components/EditValueModal';
 import { Smoof } from '@/components/smoof/Smoof';
 import { SKINS } from '@/components/smoof/palette';
 import { newDate, useClockStore } from '@/utils/clock';
+import { PLAN_NAMES } from '@/utils/gradualPlan';
 
 type EditField = 'packPrice' | 'perPack' | 'target' | null;
 
@@ -203,7 +204,7 @@ export default function ProfileScreen() {
         <View style={[styles.methodChip, { backgroundColor: colors.primary + '18' }]}>
           <Ionicons name={isGradual ? 'trending-down' : 'flash'} size={14} color={colors.primary} />
           <Text style={[styles.methodChipText, { color: colors.primary }]}>
-            {isGradual ? `Kademeli azaltma · ${profile.gradualTargetWeeks ?? 6} hafta` : 'Hemen bırakma'}
+            {isGradual ? `Kademeli azaltma · ${getActivePlan(profile).weeks} hafta` : 'Hemen bırakma'}
           </Text>
         </View>
       </View>
@@ -282,6 +283,19 @@ export default function ProfileScreen() {
               <View style={styles.infoText}>
                 <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Haftalık limitler, sigarasız gün</Text>
                 <Text style={[styles.infoValue, { color: colors.text }]}>Yol haritam</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </TouchableOpacity>
+            <Divider />
+            <TouchableOpacity style={styles.infoRow} onPress={() => router.push('/change-plan')}>
+              <View style={[styles.infoIcon, { backgroundColor: colors.secondary + '18' }]}>
+                <Ionicons name="swap-vertical" size={18} color={colors.secondary} />
+              </View>
+              <View style={styles.infoText}>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Çok hızlı ya da yavaş mı geldi?</Text>
+                <Text style={[styles.infoValue, { color: colors.text }]}>
+                  Planı değiştir · {PLAN_NAMES[getActivePlan(profile).weeks] ?? `${getActivePlan(profile).weeks} hafta`}
+                </Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
             </TouchableOpacity>
@@ -465,8 +479,13 @@ export default function ProfileScreen() {
           validate={(v) => (v > currentTarget ? `Hedef ${currentTarget} sigaradan yüksek olamaz.` : null)}
           onSubmit={async (v) => {
             const today = getTodayString();
-            const changes = (profile.gradualTargetChanges ?? []).filter((c) => c.from !== today);
-            await updateProfile({ gradualTargetChanges: [...changes, { from: today, target: v }] });
+            const all = profile.gradualTargetChanges ?? [];
+            // A plan change made today keeps its new duration, only the start limit changes
+            const samePlanChange = all.find((c) => c.from === today && c.weeks);
+            const changes = all.filter((c) => c.from !== today);
+            await updateProfile({
+              gradualTargetChanges: [...changes, { from: today, target: v, ...(samePlanChange ? { weeks: samePlanChange.weeks } : {}) }],
+            });
             setEditing(null);
             if (v === 0) Alert.alert('🎉 Hedef 0!', 'Artık hedefin tamamen sigarasız günler.');
           }}

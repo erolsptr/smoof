@@ -21,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { formatDateShort, getGradualTargetForDate, getTrackingStartDate } from '@/utils/gradualHelpers';
 import { getTodayString } from '@/utils/dateHelpers';
 import { FreezeModal } from '@/components/FreezeModal';
+import { getUnloggedDays } from '@/components/MonthCalendar';
 import { Smoof, type SmoofMood } from '@/components/smoof/Smoof';
 
 type Reaction = 'zero' | 'freeze' | 'restart';
@@ -47,6 +48,9 @@ export default function DailyLoggerScreen() {
   const today = getTodayString();
   const targetDate = (params.date as string) || today;
   const isToday = targetDate === today;
+  // "Eksik günleri gir" flow: after saving, go straight to the next missing day
+  const isMissingFlow = params.flow === 'missing';
+  const missingDays = profile && isMissingFlow ? getUnloggedDays(profile, dailyStats) : [];
   
   const [cigaretteCount, setCigaretteCount] = useState('');
   // Smoof's short reaction after saving (auto-closes, then goes back)
@@ -55,8 +59,10 @@ export default function DailyLoggerScreen() {
   const [freezeModalVisible, setFreezeModalVisible] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
 
-  // Target for the selected day (weekly auto-reduction applies to past days too)
-  const target = profile ? getGradualTargetForDate(profile, targetDate) : 0;
+  // Limit of the selected day: a logged day keeps the limit it was logged with,
+  // otherwise the plan's limit for that date (later target changes don't apply back)
+  const loggedTarget = dailyStats.find((s) => s.date === targetDate)?.targetCigarettes;
+  const target = loggedTarget ?? (profile ? getGradualTargetForDate(profile, targetDate) : 0);
   const countNum = parseInt(cigaretteCount, 10) || 0;
   const isValid = cigaretteCount.length > 0 && countNum >= 0 && countNum <= 50;
 
@@ -73,6 +79,19 @@ export default function DailyLoggerScreen() {
       setPreviousDayCount(targetStats.cigarettesSmoked);
     }
   }, [dailyStats, targetDate]);
+
+  // Leave the screen after a save: next missing day in the flow, otherwise back
+  const finish = () => {
+    const currentProfile = useUserStore.getState().profile;
+    if (isMissingFlow && currentProfile) {
+      const next = getUnloggedDays(currentProfile, useStatsStore.getState().dailyStats)[0];
+      if (next) {
+        router.replace(`/daily-logger?date=${next}&flow=missing`);
+        return;
+      }
+    }
+    router.back();
+  };
 
   // Show locked screen if date is before quit date
   if ((isBeforeQuitDate || isFutureDate) && profile) {
@@ -121,11 +140,17 @@ export default function DailyLoggerScreen() {
           targetCigarettes: target,
           metGoal: false,
         });
-        router.back();
+        finish();
         return;
       }
     }
     
+    // Only the very first 0-cigarette day ever gets the celebration:
+    // no other day has 0 yet and this day wasn't already saved as 0
+    const isFirstZeroDay = count === 0
+      && previousDayCount !== 0
+      && !dailyStats.some((s) => s.date !== targetDate && s.cigarettesSmoked === 0);
+
     // Normal save (goal met or not exceeded)
     await updateDailyStats(targetDate, {
       cigarettesSmoked: count,
@@ -135,10 +160,10 @@ export default function DailyLoggerScreen() {
     });
 
     // Celebrate the first time reaching 0
-    if (count === 0 && previousDayCount !== 0) {
+    if (isFirstZeroDay) {
       showReaction('zero');
     } else {
-      router.back();
+      finish();
     }
   };
 
@@ -146,7 +171,7 @@ export default function DailyLoggerScreen() {
     setReaction(r);
     setTimeout(() => {
       setReaction(null);
-      router.back();
+      finish();
     }, 2600);
   };
 
@@ -165,7 +190,7 @@ export default function DailyLoggerScreen() {
       showReaction('freeze');
       return;
     }
-    router.back();
+    finish();
   };
 
   const handleDeclineFreeze = async () => {
@@ -212,6 +237,14 @@ export default function DailyLoggerScreen() {
 
             {/* Question */}
             <View style={styles.questionSection}>
+              {isMissingFlow && missingDays.length > 0 && (
+                <View style={[styles.flowChip, { backgroundColor: colors.secondary + '20' }]}>
+                  <Ionicons name="calendar-outline" size={14} color={colors.secondary} />
+                  <Text style={[styles.flowChipText, { color: colors.secondary }]}>
+                    Eksik gün · {missingDays.length} gün kaldı
+                  </Text>
+                </View>
+              )}
               <Text style={[styles.question, { color: colors.text }]}>
                 {isToday ? 'Bugün' : formatDateShort(targetDate)} kaç sigara içtin? 🚬
               </Text>
@@ -324,6 +357,20 @@ export default function DailyLoggerScreen() {
 }
 
 const styles = StyleSheet.create({
+  flowChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    marginBottom: 12,
+  },
+  flowChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
   container: {
     flex: 1,
   },

@@ -7,6 +7,8 @@ export type QuitMethod = 'immediate' | 'gradual';
 export interface GradualTargetChange {
   from: string; // local date key (YYYY-MM-DD)
   target: number; // daily limit from that day
+  /** Set for a plan change: from this day reach 0 in this many weeks */
+  weeks?: number;
 }
 
 export interface UserProfile {
@@ -29,7 +31,7 @@ export interface UserProfile {
   gradualCurrentTarget?: number; // Legacy: older profiles stored the week 1 limit here
   gradualTargetWeeks?: number; // Weeks until 0 (4, 6, 8, 12)
   gradualWeeklyReduction?: number; // Legacy/display only: average weekly reduction
-  /** Manual "lower my target" changes; each re-plans from its day to 0 by the same end date */
+  /** Plan history: target changes (same end date) and plan changes (new duration from that day) */
   gradualTargetChanges?: GradualTargetChange[];
   
   // Personalization

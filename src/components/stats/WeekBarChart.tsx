@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import type { GradualDay } from '@/utils/progressMetrics';
@@ -11,16 +11,15 @@ const OVER_COLOR = '#EF4444';
 
 interface WeekBarChartProps {
   days: GradualDay[];
-  onDayPress?: (date: string) => void;
 }
 
 /**
  * Last-7-days bars: cigarettes smoked per day, with that day's target as a thin tick.
  * Single series → no legend box; the target tick and the over-target state get a key.
  * Over-target bars use the reserved error color plus an icon (never color alone).
- * Tap a bar to edit that day.
+ * Display only: days are logged from the calendar.
  */
-export function WeekBarChart({ days, onDayPress }: WeekBarChartProps) {
+export function WeekBarChart({ days }: WeekBarChartProps) {
   const { colors } = useColorScheme();
 
   const max = Math.max(1, ...days.map((d) => Math.max(d.smoked ?? 0, d.target)));
@@ -36,11 +35,10 @@ export function WeekBarChart({ days, onDayPress }: WeekBarChartProps) {
           const barColor = over ? OVER_COLOR : BAR_COLOR;
 
           return (
-            <TouchableOpacity
+            <View
               key={day.date}
               style={styles.column}
-              onPress={() => onDayPress?.(day.date)}
-              activeOpacity={0.6}
+              accessible
               accessibilityLabel={`${getDayName(day.date)}: ${logged ? `${day.smoked} sigara` : 'girilmedi'}, hedef ${day.target}`}
             >
               {/* Value label */}
@@ -65,7 +63,7 @@ export function WeekBarChart({ days, onDayPress }: WeekBarChartProps) {
                   ]}
                 />
               </View>
-            </TouchableOpacity>
+            </View>
           );
         })}
       </View>
