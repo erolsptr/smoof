@@ -20,7 +20,7 @@ import { useProgress } from '@/hooks/useProgress';
 import { newDate } from '@/utils/clock';
 import { formatDuration } from '@/utils/milestones';
 import { getPackCost } from '@/utils/progressMetrics';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect, useRef } from 'react';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useStatsStore } from '@/store/statsStore';
@@ -56,13 +56,22 @@ export default function CrisisScreen() {
   const { width, height } = useWindowDimensions();
   
   const [timeLeft, setTimeLeft] = useState(CRAVING_SECONDS);
-  const [isBreathing, setIsBreathing] = useState(false);
+  // Opened from a chip on the home card: start with that tool already open
+  const { open } = useLocalSearchParams<{ open?: 'breath' | 'hide' | 'garden' }>();
+  const [isBreathing, setIsBreathing] = useState(open === 'breath');
   const [showResult, setShowResult] = useState(false);
   const [showSlipFlow, setShowSlipFlow] = useState(false);
   const [slipStep, setSlipStep] = useState<'trigger' | 'support' | 'result'>('trigger');
   const [selectedTrigger, setSelectedTrigger] = useState<string | null>(null);
   // Mini game: opens over this screen, so the craving timer keeps running
   const [gameOpen, setGameOpen] = useState<'hide' | 'garden' | null>(null);
+  // A game chip on the home card: open it once this (modal) screen has finished
+  // sliding in; iOS can drop a second modal presented during that animation
+  useEffect(() => {
+    if (open !== 'hide' && open !== 'garden') return;
+    const id = setTimeout(() => setGameOpen(open), 450);
+    return () => clearTimeout(id);
+  }, [open]);
   const [gameFound, setGameFound] = useState(0);
   const [gamePlanted, setGamePlanted] = useState(0);
   const playedGame = useRef(false);
