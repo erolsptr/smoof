@@ -22,6 +22,10 @@ const LIVES = 3;
 const HUES = [120, 150, 165, 95, 80, 45, 28, 190, 330];
 const CRITTERS = ['🐞', '🐌', '🍄', '🐛', '🐜', '🌰'];
 const NEXT_LEVEL_MS = 1300;
+/** Clean finds in a row (no wrong leaf, no time out) that give a heart back */
+const COMBO_FOR_LIFE = 3;
+/** Points instead of a heart when the hearts are already full */
+const COMBO_FULL_BONUS = 15;
 
 interface Level {
   no: number;
@@ -39,11 +43,12 @@ interface Level {
 function makeLevel(no: number): Level {
   const size = no <= 2 ? 3 : no <= 5 ? 4 : no <= 9 ? 5 : no <= 14 ? 6 : 7;
   const count = size * size;
-  const delta = Math.max(3, 20 - (no - 1) * 1.1);
+  const delta = Math.max(4, 20 - (no - 1) * 1.1);
   // From level 8 the other leaves vary a little, so "find the lightest" isn't enough.
-  // Capped at 20% of the real difference: the widest gap between two normal
-  // leaves (2 × jitter = 40%) always stays well below Smoof's (≥ 80%).
-  const jitter = no >= 8 ? Math.min(delta * 0.2, (no - 7) * 0.3) : 0;
+  // It ramps up slowly and only reaches its maximum (20% of the real difference)
+  // at level 30. Even then two normal leaves differ at most 40% as much as Smoof's.
+  const ramp = no >= 8 ? Math.min(1, (no - 7) / 23) : 0;
+  const jitter = delta * 0.2 * ramp;
   return {
     no,
     size,
@@ -194,6 +199,8 @@ export function ChameleonHide({ onClose }: ChameleonHideProps) {
   const [popupAnim] = useState(() => new Animated.Value(0));
 
   const livesRef = useRef(LIVES);
+  const comboRef = useRef(0);
+  const [combo, setCombo] = useState(0);
   const scoreRef = useRef(0);
   const foundRef = useRef(0);
   const bestRef = useRef(0);
@@ -250,6 +257,8 @@ export function ChameleonHide({ onClose }: ChameleonHideProps) {
 
   const startGame = () => {
     livesRef.current = LIVES;
+    comboRef.current = 0;
+    setCombo(0);
     scoreRef.current = 0;
     foundRef.current = 0;
     setLives(LIVES);
@@ -273,6 +282,9 @@ export function ChameleonHide({ onClose }: ChameleonHideProps) {
   };
 
   const loseLife = () => {
+    // Any miss breaks the combo
+    comboRef.current = 0;
+    setCombo(0);
     livesRef.current -= 1;
     setLives(livesRef.current);
     heartPulse.setValue(1.4);
@@ -313,14 +325,35 @@ export function ChameleonHide({ onClose }: ChameleonHideProps) {
         remaining = value;
       });
       const secondsLeft = Math.max(0, remaining * level.seconds);
-      const gained = 10 * level.no + Math.ceil(secondsLeft) * 2;
+      let gained = 10 * level.no + Math.ceil(secondsLeft) * 2;
+      let reward = '';
+      let rewardMessage = '';
+
+      // Combo: every 3 clean finds in a row give a heart back (or bonus points if full)
+      comboRef.current += 1;
+      setCombo(comboRef.current);
+      if (comboRef.current % COMBO_FOR_LIFE === 0) {
+        if (livesRef.current < LIVES) {
+          livesRef.current += 1;
+          setLives(livesRef.current);
+          heartPulse.setValue(1.5);
+          Animated.spring(heartPulse, { toValue: 1, friction: 3, useNativeDriver: true }).start();
+          reward = ' · +1 ❤️';
+          rewardMessage = 'Kombo! Bir can geri kazandın ❤️';
+        } else {
+          gained += COMBO_FULL_BONUS;
+          reward = ' 🔥';
+          rewardMessage = `Kombo! Canların dolu, +${COMBO_FULL_BONUS} bonus 🔥`;
+        }
+      }
+
       scoreRef.current += gained;
       foundRef.current += 1;
       setScore(scoreRef.current);
       setFound(foundRef.current);
       setTiles((t) => t.map((s, i) => (i === index ? 'smoof' : s)));
-      setMessage(['Buldun! 🎉', 'Yakaladın! 🦎', 'Gözünden kaçmıyor! 👀', 'Harika! ✨'][level.no % 4]);
-      showPopup(`+${gained}`);
+      setMessage(rewardMessage || ['Buldun! 🎉', 'Yakaladın! 🦎', 'Gözünden kaçmıyor! 👀', 'Harika! ✨'][level.no % 4]);
+      showPopup(`+${gained}${reward}`);
       later(() => startLevel(level.no + 1), NEXT_LEVEL_MS);
       return;
     }
@@ -404,6 +437,22 @@ export function ChameleonHide({ onClose }: ChameleonHideProps) {
         />
       </View>
 
+      {/* Combo progress towards a heart */}
+      <View style={styles.comboRow}>
+        <Text style={[styles.comboLabel, { color: colors.textSecondary }]}>Kombo</Text>
+        {Array.from({ length: COMBO_FOR_LIFE }).map((_, i) => {
+          // Right after a reward the row is shown full until the next board
+          const filled = combo > 0 && (combo % COMBO_FOR_LIFE === 0 ? COMBO_FOR_LIFE : combo % COMBO_FOR_LIFE);
+          return (
+            <View
+              key={i}
+              style={[styles.comboDot, { backgroundColor: i < (filled || 0) ? colors.streakFire : colors.cardBorder }]}
+            />
+          );
+        })}
+        <Text style={styles.comboHeart}>❤️</Text>
+      </View>
+
       <Text style={[styles.message, { color: resolved && tiles.includes('smoof') ? colors.primary : colors.text }]}>
         {phase === 'playing' ? message : ' '}
       </Text>
@@ -463,6 +512,7 @@ export function ChameleonHide({ onClose }: ChameleonHideProps) {
               ['🍃', 'Farklı yaprak', 'Rengi biraz farklı olan yaprağın altındayım'],
               ['⏱️', 'Süre', 'Süre bitmeden bul, kalan süre bonus puan'],
               ['❤️', '3 can', 'Yanlış yaprak ya da biten süre bir can götürür'],
+              ['🔥', 'Kombo', 'Art arda 3 kez hatasız bul, 1 can geri gelsin'],
               ['📈', 'Seviye', 'Her seviyede yaprak çoğalır, renkler yakınlaşır'],
             ].map(([icon, name, desc]) => (
               <View key={name} style={styles.ruleRow}>
@@ -536,7 +586,11 @@ const styles = StyleSheet.create({
   timeTrack: { height: 10, borderRadius: 5, marginHorizontal: 20, marginTop: 10, overflow: 'hidden' },
   timeFill: { height: '100%', borderRadius: 5 },
 
-  message: { fontSize: 16, fontWeight: '700', marginTop: 14, marginBottom: 12, textAlign: 'center', paddingHorizontal: 20 },
+  comboRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10 },
+  comboLabel: { fontSize: 12, fontWeight: '700', marginRight: 2 },
+  comboDot: { width: 18, height: 6, borderRadius: 3 },
+  comboHeart: { fontSize: 12, marginLeft: 2 },
+  message: { fontSize: 16, fontWeight: '700', marginTop: 8, marginBottom: 12, textAlign: 'center', paddingHorizontal: 20 },
 
   panelWrap: { alignItems: 'center', paddingHorizontal: 16 },
   panel: { borderRadius: 24, alignItems: 'center' },

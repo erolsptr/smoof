@@ -369,7 +369,7 @@ export function SmokeGarden({ onClose }: SmokeGardenProps) {
                 kind,
                 x: 8 + Math.random() * Math.max(0, area.width - size - 16),
                 size,
-                duration: lerp(7200, 3600, t) * speedUp * (0.85 + Math.random() * 0.3),
+                duration: lerp(5800, 2900, t) * speedUp * (0.85 + Math.random() * 0.3),
                 sway: 8 + Math.random() * 22,
               },
             ],
