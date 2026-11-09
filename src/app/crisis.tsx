@@ -3,14 +3,19 @@ import {
   Text, 
   StyleSheet, 
   TouchableOpacity, 
-  Animated,
   ScrollView,
   Platform,
+  Modal,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Smoof } from '@/components/smoof/Smoof';
+import { ChameleonHide } from '@/components/games/ChameleonHide';
+import { SmokeGarden } from '@/components/games/SmokeGarden';
+import { BreathingGuide } from '@/components/crisis/BreathingGuide';
+import { CravingTimer } from '@/components/crisis/CravingTimer';
 import { useProgress } from '@/hooks/useProgress';
 import { newDate } from '@/utils/clock';
 import { formatDuration } from '@/utils/milestones';
@@ -33,6 +38,9 @@ const TRIGGER_TIPS: Record<string, string> = {
   other: 'İsteği tetikleyen anı not al. Fark etmek, bir dahakine hazırlıklı olmanın ilk adımı.',
 };
 
+/** A craving usually peaks and passes within ~5 minutes */
+const CRAVING_SECONDS = 300;
+
 /**
  * Crisis Mode Modal
  * Helps user resist cigarette cravings
@@ -45,77 +53,34 @@ export default function CrisisScreen() {
   const userProfile = useUserStore((state) => state.profile);
   const { immediate } = useProgress();
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
   
-  const [timeLeft, setTimeLeft] = useState(300); // 5 minutes = 300 seconds
+  const [timeLeft, setTimeLeft] = useState(CRAVING_SECONDS);
   const [isBreathing, setIsBreathing] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [showSlipFlow, setShowSlipFlow] = useState(false);
   const [slipStep, setSlipStep] = useState<'trigger' | 'support' | 'result'>('trigger');
   const [selectedTrigger, setSelectedTrigger] = useState<string | null>(null);
-  const [breathPhase, setBreathPhase] = useState<'inhale' | 'exhale'>('inhale');
-  
-  // Animation for breathing exercise
-  const breatheAnim = useRef(new Animated.Value(0)).current;
-  
-  // Timer countdown
+  // Mini game: opens over this screen, so the craving timer keeps running
+  const [gameOpen, setGameOpen] = useState<'hide' | 'garden' | null>(null);
+  const [gameFound, setGameFound] = useState(0);
+  const [gamePlanted, setGamePlanted] = useState(0);
+  const playedGame = useRef(false);
+
+  // Craving timer: counts down to 0 and stops there. It never ends the screen
+  // by itself (the user may still be playing or breathing).
   useEffect(() => {
-    if (timeLeft > 0 && !showResult) {
-      const timer = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-      }, 1000);
-      
-      return () => clearInterval(timer);
-    }
-  }, [timeLeft, showResult]);
-  
-  // Auto-complete if timer reaches 0
-  useEffect(() => {
-    if (timeLeft === 0 && !showResult) {
-      handleResisted();
-    }
-  }, [timeLeft]);
-  
-  // Breathing animation
-  useEffect(() => {
-    if (isBreathing) {
-      const animation = Animated.loop(
-        Animated.sequence([
-          Animated.timing(breatheAnim, {
-            toValue: 1,
-            duration: 4000, // 4 sec inhale
-            useNativeDriver: true,
-          }),
-          Animated.timing(breatheAnim, {
-            toValue: 0,
-            duration: 4000, // 4 sec exhale
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      
-      animation.start();
-      
-      // Update phase indicator
-      const phaseInterval = setInterval(() => {
-        setBreathPhase((prev) => prev === 'inhale' ? 'exhale' : 'inhale');
-      }, 4000);
-      
-      return () => {
-        animation.stop();
-        clearInterval(phaseInterval);
-      };
-    } else {
-      breatheAnim.setValue(0);
-      setBreathPhase('inhale');
-    }
-  }, [isBreathing]);
+    if (showResult) return;
+    const id = setInterval(() => setTimeLeft((prev) => Math.max(0, prev - 1)), 1000);
+    return () => clearInterval(id);
+  }, [showResult]);
   
   const handleResisted = async () => {
     // Log successful resistance
     await logCrisis({
       timestamp: newDate().toISOString(),
       handled: true,
-      method: isBreathing ? 'breathing' : 'motivation',
+      method: isBreathing ? 'breathing' : playedGame.current ? 'minigame' : 'motivation',
     });
     
     setShowResult(true);
@@ -182,28 +147,16 @@ export default function CrisisScreen() {
     router.back();
   };
   
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-  
   // Motivational message (static, doesn't change)
   const [motivationMessage] = useState(() => {
     const messages = [
       "İstek sadece 5 dakika sürer. Sen daha güçlüsün! 💪",
-      "Düşün: Şu ana kadar ne kadar yol kattettin! 🌟",
+      "Düşün: Şu ana kadar ne kadar yol kat ettin! 🌟",
       "Bu anı atlatırsan, kendini çok daha iyi hissedeceksin! ✨",
       "İçindeki güce inan. Sen yapabilirsin! 🦸",
       "Her direniş seni daha güçlü yapıyor! 🔥",
     ];
     return messages[Math.floor(Math.random() * messages.length)];
-  });
-  
-  // Breathe animation scale - stronger animation
-  const breathScale = breatheAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.4],
   });
   
   if (showResult) {
@@ -515,82 +468,135 @@ export default function CrisisScreen() {
     );
   }
   
+  const heroSize = Math.round(Math.min(width * 0.62, Math.max(170, height * 0.27)));
+
   return (
     <View style={[styles.mainContainer, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? Spacing.sm : insets.top + Spacing.sm }]}>
-        <TouchableOpacity onPress={handleClose} hitSlop={12} accessibilityLabel="Kapat">
-          <Text style={[styles.closeButton, { color: colors.textSecondary }]}>✕</Text>
+      <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? Spacing.md : insets.top + Spacing.sm }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Birlikte atlatalım 💚</Text>
+          <Text style={[styles.headerSub, { color: colors.textSecondary }]}>{motivationMessage}</Text>
+        </View>
+        <TouchableOpacity
+          onPress={handleClose}
+          hitSlop={12}
+          accessibilityLabel="Kapat"
+          style={[styles.closeCircle, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+        >
+          <Ionicons name="close" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={styles.mainContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Mascot - only the image scales, so the layout doesn't jump */}
-        <View style={styles.mascotContainer}>
-          <Animated.View style={{ transform: [{ scale: isBreathing ? breathScale : 1 }] }}>
-            {/* Craving: cranky & tired. Breathing: follows the phase */}
-            <Smoof
-              mood={isBreathing ? breathPhase : 'craving'}
-              size={140}
-              animation={isBreathing ? 'none' : 'sway'}
-            />
-          </Animated.View>
+        {/* Hero: craving timer, or the breathing guide while breathing */}
+        <View style={styles.hero}>
+          {isBreathing ? (
+            <BreathingGuide size={heroSize} />
+          ) : (
+            <CravingTimer size={heroSize} timeLeft={timeLeft} total={CRAVING_SECONDS} />
+          )}
         </View>
 
-        {/* Breath phase indicator */}
-        {isBreathing && (
-          <View style={[styles.breathPhaseIndicator, { backgroundColor: colors.accent + '20' }]}>
-            <Text style={styles.breathPhaseIcon}>
-              {breathPhase === 'inhale' ? '⬇️' : '⬆️'}
-            </Text>
-            <Text style={[styles.breathPhaseText, { color: colors.accent }]}>
-              {breathPhase === 'inhale' ? 'NEFES AL' : 'NEFES VER'}
-            </Text>
-          </View>
-        )}
-
-        {/* Timer */}
-        <View style={[styles.timerCard, { backgroundColor: colors.card }]}>
-          <Text style={[styles.timerLabel, { color: colors.textSecondary }]}>
-            İstek geçene kadar:
-          </Text>
-          <Text style={[styles.timerValue, { color: colors.primary }]}>
-            {formatTime(timeLeft)}
-          </Text>
-        </View>
-
-        {/* Motivation */}
-        <View style={[styles.motivationCard, { backgroundColor: colors.card }]}>
-          <Text style={[styles.motivationText, { color: colors.text }]}>
-            {motivationMessage}
-          </Text>
-        </View>
-
-        {/* Breathing Exercise Button */}
-        <TouchableOpacity
-          style={[
-            styles.breathButton,
+        {/* Tools */}
+        <View style={styles.tools}>
+          {[
             {
-              backgroundColor: isBreathing ? colors.accent : colors.card,
-              borderColor: colors.accent,
+              key: 'breath',
+              active: isBreathing,
+              color: colors.accent,
+              icon: <Ionicons name={isBreathing ? 'pause' : 'leaf'} size={20} color="#FFF" />,
+              title: isBreathing ? 'Bitir' : 'Nefes',
+              text: isBreathing ? 'Zamanlayıcıya dön' : '4 al · 2 tut · 6 ver',
+              onPress: () => setIsBreathing(!isBreathing),
+              label: isBreathing ? 'Nefes egzersizini bitir' : 'Nefes egzersizini başlat',
             },
-          ]}
-          onPress={() => setIsBreathing(!isBreathing)}
-        >
-          <Text style={[
-            styles.breathButtonText,
-            { color: isBreathing ? '#FFFFFF' : colors.accent }
-          ]}>
-            {isBreathing ? '🫁 Nefes Alıyorum...' : '🫁 Nefes Egzersizi Başlat'}
-          </Text>
-        </TouchableOpacity>
+            {
+              key: 'hide',
+              active: false,
+              color: colors.primary,
+              icon: <Text style={styles.toolEmoji}>🦎</Text>,
+              title: 'Saklambaç',
+              text: gameFound > 0 ? `${gameFound} kez buldun` : "Smoof'u bul",
+              onPress: () => {
+                setIsBreathing(false);
+                setGameOpen('hide');
+              },
+              label: 'Bukalemun Saklambaç oyununu aç',
+            },
+            {
+              key: 'garden',
+              active: false,
+              color: colors.secondary,
+              icon: <Text style={styles.toolEmoji}>🌸</Text>,
+              title: 'Bahçe',
+              text: gamePlanted > 0 ? `En iyi: ${gamePlanted} puan` : 'Gökyüzünü temizle',
+              onPress: () => {
+                setIsBreathing(false);
+                setGameOpen('garden');
+              },
+              label: 'Duman Bahçesi oyununu aç',
+            },
+          ].map((tool) => (
+            <TouchableOpacity
+              key={tool.key}
+              style={[
+                styles.tool,
+                tool.active
+                  ? { backgroundColor: tool.color, borderColor: tool.color }
+                  : { backgroundColor: tool.color + '14', borderColor: tool.color + '55' },
+              ]}
+              onPress={tool.onPress}
+              activeOpacity={0.8}
+              accessibilityLabel={tool.label}
+            >
+              <View style={[styles.toolIcon, { backgroundColor: tool.active ? 'rgba(255,255,255,0.25)' : tool.color }]}>
+                {tool.icon}
+              </View>
+              <Text style={[styles.toolTitle, { color: tool.active ? '#FFF' : colors.text }]} numberOfLines={1}>
+                {tool.title}
+              </Text>
+              <Text
+                style={[styles.toolText, { color: tool.active ? 'rgba(255,255,255,0.85)' : colors.textSecondary }]}
+                numberOfLines={2}
+              >
+                {tool.text}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </ScrollView>
 
-      {/* Action Buttons - pinned to the bottom, always visible */}
+      <Modal
+        visible={gameOpen !== null}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setGameOpen(null)}
+      >
+        {gameOpen === 'garden' ? (
+          <SmokeGarden
+            onClose={(score) => {
+              playedGame.current = true;
+              setGamePlanted((prev) => Math.max(prev, score));
+              setGameOpen(null);
+            }}
+          />
+        ) : (
+          <ChameleonHide
+            onClose={(found) => {
+              playedGame.current = true;
+              setGameFound((prev) => Math.max(prev, found));
+              setGameOpen(null);
+            }}
+          />
+        )}
+      </Modal>
+
+      {/* Actions - pinned to the bottom, always visible */}
       <View
         style={[
           styles.actions,
@@ -602,25 +608,18 @@ export default function CrisisScreen() {
         ]}
       >
         <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: colors.primary }]}
+          style={[styles.resistButton, { backgroundColor: colors.primary }]}
           onPress={handleResisted}
+          activeOpacity={0.85}
         >
-          <Text style={styles.actionButtonText}>💪 Direndim</Text>
+          <Text style={styles.resistButtonText}>💪 Direndim</Text>
         </TouchableOpacity>
 
         {!isGradualMode && (
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: colors.error, opacity: 0.7 }]}
-            onPress={handleGaveIn}
-          >
-            <Text style={styles.actionButtonText}>😔 İçtim</Text>
+          <TouchableOpacity onPress={handleGaveIn} hitSlop={8} style={styles.gaveInButton}>
+            <Text style={[styles.gaveInText, { color: colors.textSecondary }]}>İçtim, ne yapmalıyım?</Text>
           </TouchableOpacity>
         )}
-
-        {/* Helper text */}
-        <Text style={[styles.helperText, { color: colors.textSecondary }]}>
-          İstek genelde birkaç dakikada geçer. Atlattığında “Direndim”e bas 💪
-        </Text>
       </View>
     </View>
   );
@@ -635,105 +634,96 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.md,
     paddingHorizontal: Spacing.lg,
-    alignItems: 'flex-end',
+  },
+  headerTitle: {
+    fontSize: Typography.sizes.xl,
+    fontWeight: Typography.weights.bold,
+  },
+  headerSub: {
+    fontSize: Typography.sizes.sm,
+    marginTop: 2,
+    lineHeight: Typography.sizes.sm * 1.4,
+  },
+  closeCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mainContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.md,
+  },
+  hero: {
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+  },
+  tools: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+  tool: {
+    flex: 1,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1.5,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.sm + 2,
+    gap: 2,
+  },
+  toolIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  toolEmoji: {
+    fontSize: 22,
+  },
+  toolTitle: {
+    fontSize: Typography.sizes.base,
+    fontWeight: Typography.weights.bold,
+  },
+  toolText: {
+    fontSize: Typography.sizes.xs,
+  },
+  resistButton: {
+    paddingVertical: 16,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+  },
+  resistButtonText: {
+    color: '#FFFFFF',
+    fontSize: Typography.sizes.lg,
+    fontWeight: Typography.weights.bold,
+  },
+  gaveInButton: {
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  gaveInText: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.semibold,
+    textDecorationLine: 'underline',
   },
   scroll: {
     flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: Spacing.lg,
-  },
-  closeButton: {
-    fontSize: Typography.sizes['2xl'],
-    padding: Spacing.sm,
-  },
-  mascotContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 200, // room for the 1.4x breathing scale
-    marginBottom: Spacing.md,
-  },
-  mascot: {
-    width: 100,
-    height: 100,
-  },
-  breathPhaseIndicator: {
-    alignSelf: 'center',
-    flexDirection: 'row',
-    marginBottom: Spacing.md,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: 24,
-    alignItems: 'center',
-    gap: 8,
-  },
-  breathPhaseIcon: {
-    fontSize: 22,
-  },
-  breathPhaseText: {
-    fontSize: 20,
-    fontWeight: Typography.weights.bold,
-    letterSpacing: 2,
-  },
-  timerCard: {
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.md,
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.xl,
-    alignItems: 'center',
-  },
-  timerLabel: {
-    fontSize: Typography.sizes.base,
-    marginBottom: Spacing.sm,
-  },
-  timerValue: {
-    fontSize: Typography.sizes['5xl'],
-    fontWeight: Typography.weights.extrabold,
-  },
-  motivationCard: {
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.md,
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-  },
-  motivationText: {
-    fontSize: Typography.sizes.lg,
-    textAlign: 'center',
-    lineHeight: Typography.sizes.lg * Typography.lineHeights.relaxed,
-  },
-  breathButton: {
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.md,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
-    borderWidth: 2,
-    alignItems: 'center',
-  },
-  breathButtonText: {
-    fontSize: Typography.sizes.base,
-    fontWeight: Typography.weights.bold,
   },
   actions: {
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
     gap: Spacing.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  actionButton: {
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
-    alignItems: 'center',
-  },
-  actionButtonText: {
-    color: '#FFFFFF',
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
-  },
-  helperText: {
-    fontSize: Typography.sizes.sm,
-    textAlign: 'center',
-    paddingHorizontal: Spacing.sm,
   },
   resultContent: {
     flex: 1,

@@ -50,4 +50,7 @@ export const STORAGE_KEYS = {
   NOTIFICATION_SETTINGS: '@smoof:notification_settings',
   ACHIEVEMENTS: '@smoof:achievements',
   DEBUG_DAY_OFFSET: '@smoof:debug_day_offset',
+  GAME_BEST_HIDE: '@smoof:game_best_hide',
+  GAME_BEST_HIDE_SCORE: '@smoof:game_best_hide_score',
+  GAME_BEST_GARDEN: '@smoof:game_best_garden',
 } as const;
