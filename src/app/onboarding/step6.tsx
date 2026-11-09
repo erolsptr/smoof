@@ -1,14 +1,22 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Platform, ScrollView } from 'react-native';
 import { router } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { Smoof } from '@/components/smoof/Smoof';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { Spacing, Typography, BorderRadius } from '@/constants';
 import { useOnboardingStore } from '../../store/onboardingStore';
 import { useUserStore } from '../../store/userStore';
 import type { UserProfile } from '../../types';
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Onboarding last step: start date (same look as the other onboarding steps)
+ */
 export default function Step6Screen() {
+  const { colors, isDark } = useColorScheme();
   const { data, setStep6Data } = useOnboardingStore();
   const setProfile = useUserStore((state) => state.setProfile);
   
@@ -59,131 +67,137 @@ export default function Step6Screen() {
   };
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('tr-TR', { 
-      day: 'numeric', 
-      month: 'long', 
-      year: 'numeric' 
+    return date.toLocaleDateString('tr-TR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
     });
   };
 
+  const isGradual = data.quitMethod === 'gradual';
+  // Whole days until the chosen date (0 = today)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const picked = new Date(selectedDate);
+  picked.setHours(0, 0, 0, 0);
+  const daysUntil = Math.round((picked.getTime() - today.getTime()) / DAY_MS);
+  const startsLater = selectedOption === 'date' && daysUntil > 0;
+
+  const options = [
+    {
+      key: 'now' as const,
+      icon: '🚀',
+      title: 'Hemen başla',
+      desc: isGradual ? 'Planın bugün başlasın' : 'Şu andan itibaren sigarasızsın',
+      onPress: () => {
+        setSelectedOption('now');
+        setSelectedDate(new Date());
+      },
+    },
+    {
+      key: 'date' as const,
+      icon: '📅',
+      title: 'Tarih seç',
+      desc: selectedOption === 'date' ? formatDate(selectedDate) : 'En fazla 90 gün sonrası',
+      onPress: () => setShowDatePicker(true),
+    },
+  ];
+
+  const infoText = !selectedOption
+    ? 'Bugün başlayabilir ya da kendini hazır hissettiğin bir gün seçebilirsin.'
+    : startsLater
+      ? `${daysUntil} gün sonra başlıyoruz. O zamana kadar hazırlık modunda sana yardımcı olacağım.`
+      : 'Harika! Her yolculuk bir adımla başlar. Sen de bu adımı atıyorsun! 💪';
+
   return (
-    <LinearGradient colors={['#4ECDC4', '#44A08D']} style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.content}>
-        <View style={styles.iconContainer}>
-          <Ionicons name="calendar" size={48} color="#fff" />
-        </View>
-
-        <Text style={styles.title}>Ne Zaman Başlıyoruz?</Text>
-        <Text style={styles.subtitle}>
-          Sigarayı bırakma yolculuğuna başlamak için bir tarih seç
-        </Text>
-
-        <View style={styles.optionsContainer}>
-          <TouchableOpacity
-            style={[
-              styles.optionCard,
-              selectedOption === 'now' && styles.optionCardSelected,
-            ]}
-            onPress={() => {
-              setSelectedOption('now');
-              setSelectedDate(new Date());
-            }}
-          >
-            <View style={styles.optionContent}>
-              <View style={styles.optionIconContainer}>
-                <Ionicons name="flash" size={32} color="#4ECDC4" />
-              </View>
-              <View style={styles.optionTextContainer}>
-                <Text style={styles.optionTitle}>Hemen Başla</Text>
-                <Text style={styles.optionDescription}>Şimdi başlayalım!</Text>
-              </View>
-              {selectedOption === 'now' && (
-                <Ionicons name="checkmark-circle" size={28} color="#4ECDC4" />
-              )}
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.optionCard,
-              selectedOption === 'date' && styles.optionCardSelected,
-            ]}
-            onPress={() => setShowDatePicker(true)}
-          >
-            <View style={styles.optionContent}>
-              <View style={styles.optionIconContainer}>
-                <Ionicons name="calendar-outline" size={32} color="#4ECDC4" />
-              </View>
-              <View style={styles.optionTextContainer}>
-                <Text style={styles.optionTitle}>Tarih Seç</Text>
-                <Text style={styles.optionDescription}>
-                  {selectedOption === 'date' 
-                    ? formatDate(selectedDate)
-                    : 'İstediğin bir tarih seç'}
-                </Text>
-              </View>
-              {selectedOption === 'date' && (
-                <Ionicons name="checkmark-circle" size={28} color="#4ECDC4" />
-              )}
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {selectedOption && (
-          <View style={styles.motivationalBox}>
-            <Ionicons name="heart" size={24} color="#FC8181" />
-            <Text style={styles.motivationalText}>
-              Harika! Her yolculuk bir adımla başlar. Sen de bu adımı atıyorsun! 💪
-            </Text>
-          </View>
-        )}
-
-        <TouchableOpacity
-          style={[styles.continueButton, !selectedOption && styles.continueButtonDisabled]}
-          onPress={handleContinue}
-          disabled={!selectedOption}
-        >
-          <Text style={styles.continueButtonText}>Başlayalım!</Text>
-          <Ionicons name="arrow-forward" size={20} color="#4ECDC4" />
-        </TouchableOpacity>
-
-        <View style={styles.progressDots}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Progress */}
+        <View style={styles.progress}>
           {[0, 1, 2, 3, 4].map((i) => (
-            <View
-              key={i}
-              style={[styles.dot, i === 4 && styles.dotActive]}
-            />
+            <View key={i} style={[styles.progressDot, { backgroundColor: colors.primary }]} />
           ))}
         </View>
-      </View>
 
-      {/* Date Picker Modal */}
+        {/* Mascot */}
+        <Smoof mood="excited" size={80} animation="bob" style={styles.mascot} />
+
+        {/* Question */}
+        <Text style={[styles.question, { color: colors.text }]}>Ne zaman başlıyoruz? 📅</Text>
+        <Text style={[styles.hint, { color: colors.textSecondary }]}>
+          {isGradual ? 'Kademeli azaltma planın hangi gün başlasın?' : 'Sigarasız yolculuğun hangi gün başlasın?'}
+        </Text>
+
+        {/* Options */}
+        <View style={styles.options}>
+          {options.map((option) => {
+            const isSelected = selectedOption === option.key;
+            return (
+              <TouchableOpacity
+                key={option.key}
+                style={[
+                  styles.optionCard,
+                  {
+                    backgroundColor: isSelected ? colors.primary : colors.card,
+                    borderColor: isSelected ? colors.primary : colors.cardBorder,
+                  },
+                ]}
+                onPress={option.onPress}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.optionIcon}>{option.icon}</Text>
+                <View style={styles.optionText}>
+                  <Text style={[styles.optionTitle, { color: isSelected ? '#FFFFFF' : colors.text }]}>
+                    {option.title}
+                  </Text>
+                  <Text style={[styles.optionDesc, { color: isSelected ? 'rgba(255,255,255,0.9)' : colors.textSecondary }]}>
+                    {option.desc}
+                  </Text>
+                </View>
+                {isSelected ? (
+                  <Ionicons name="checkmark-circle" size={28} color="#FFFFFF" />
+                ) : option.key === 'date' ? (
+                  <Ionicons name="chevron-forward" size={22} color={colors.textTertiary} />
+                ) : null}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Info Box */}
+        <View style={[styles.infoBox, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+          <Ionicons name={selectedOption ? 'heart' : 'information-circle'} size={20} color={colors.primary} />
+          <Text style={[styles.infoText, { color: colors.textSecondary }]}>{infoText}</Text>
+        </View>
+      </ScrollView>
+
+      {/* Continue Button */}
+      <TouchableOpacity
+        style={[styles.button, { backgroundColor: selectedOption ? colors.primary : colors.cardBorder }]}
+        onPress={handleContinue}
+        disabled={!selectedOption}
+        activeOpacity={0.8}
+      >
+        <Text style={[styles.buttonText, { opacity: selectedOption ? 1 : 0.5 }]}>Başlayalım! 🚀</Text>
+      </TouchableOpacity>
+
+      {/* Date Picker */}
       {Platform.OS === 'ios' ? (
-        <Modal
-          visible={showDatePicker}
-          transparent
-          animationType="slide"
-        >
+        <Modal visible={showDatePicker} transparent animationType="slide">
           <View style={styles.modalOverlay}>
-            <View style={styles.datePickerContainer}>
-              <View style={styles.datePickerHeader}>
+            <View style={[styles.datePickerContainer, { backgroundColor: colors.card }]}>
+              <View style={[styles.datePickerHeader, { borderBottomColor: colors.cardBorder }]}>
                 <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text style={styles.cancelButton}>İptal</Text>
+                  <Text style={[styles.cancelButton, { color: colors.textSecondary }]}>İptal</Text>
                 </TouchableOpacity>
-                <Text style={styles.datePickerTitle}>Tarih Seç</Text>
-                <TouchableOpacity 
+                <Text style={[styles.datePickerTitle, { color: colors.text }]}>Başlangıç tarihi</Text>
+                <TouchableOpacity
                   onPress={() => {
                     setSelectedOption('date');
                     setShowDatePicker(false);
                   }}
                 >
-                  <Text style={styles.doneButton}>Tamam</Text>
+                  <Text style={[styles.doneButton, { color: colors.primary }]}>Tamam</Text>
                 </TouchableOpacity>
               </View>
               <DateTimePicker
@@ -192,9 +206,10 @@ export default function Step6Screen() {
                 display="spinner"
                 onChange={handleDateChange}
                 minimumDate={new Date()}
-                maximumDate={new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)} // 90 gün sonrası
+                maximumDate={new Date(Date.now() + 90 * DAY_MS)}
                 locale="tr-TR"
-                textColor="#2D3748"
+                themeVariant={isDark ? 'dark' : 'light'}
+                textColor={colors.text}
               />
             </View>
           </View>
@@ -207,11 +222,11 @@ export default function Step6Screen() {
             display="default"
             onChange={handleDateChange}
             minimumDate={new Date()}
-            maximumDate={new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)}
+            maximumDate={new Date(Date.now() + 90 * DAY_MS)}
           />
         )
       )}
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -219,139 +234,87 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 20,
-  },
-  iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    padding: Spacing.lg,
+    paddingTop: Spacing['4xl'],
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 12,
-  },
-  subtitle: {
-    fontSize: 17,
-    color: 'rgba(255,255,255,0.9)',
-    marginBottom: 32,
-    lineHeight: 24,
-  },
-  optionsContainer: {
-    gap: 16,
-    marginBottom: 24,
-  },
-  optionCard: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  optionCardSelected: {
-    borderColor: '#4ECDC4',
-    backgroundColor: '#f0fffe',
-  },
-  optionContent: {
+  progress: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
+    gap: Spacing.sm,
+    marginBottom: Spacing['2xl'],
   },
-  optionIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(78, 205, 196, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  optionTextContainer: {
-    flex: 1,
-  },
-  optionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#2D3748',
-    marginBottom: 4,
-  },
-  optionDescription: {
-    fontSize: 14,
-    color: '#718096',
-  },
-  motivationalBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    padding: 16,
-    borderRadius: 16,
-    gap: 12,
-    marginBottom: 24,
-  },
-  motivationalText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#2D3748',
-    lineHeight: 20,
-  },
-  continueButton: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
-    marginBottom: 24,
-  },
-  continueButtonDisabled: {
-    opacity: 0.5,
-  },
-  continueButtonText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#4ECDC4',
-  },
-  progressDots: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    paddingBottom: 40,
-  },
-  dot: {
+  progressDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.3)',
   },
-  dotActive: {
-    backgroundColor: '#fff',
-    width: 24,
+  mascot: {
+    width: 80,
+    marginBottom: Spacing.xl,
+  },
+  question: {
+    fontSize: Typography.sizes['2xl'],
+    fontWeight: Typography.weights.bold,
+    textAlign: 'center',
+    marginBottom: Spacing.md,
+  },
+  hint: {
+    fontSize: Typography.sizes.sm,
+    textAlign: 'center',
+    marginBottom: Spacing.xl,
+  },
+  options: {
+    width: '100%',
+    gap: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  optionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 2,
+  },
+  optionIcon: {
+    fontSize: 36,
+  },
+  optionText: {
+    flex: 1,
+  },
+  optionTitle: {
+    fontSize: Typography.sizes.lg,
+    fontWeight: Typography.weights.bold,
+    marginBottom: 2,
+  },
+  optionDesc: {
+    fontSize: Typography.sizes.sm,
+  },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    width: '100%',
+  },
+  infoText: {
+    fontSize: Typography.sizes.sm,
+    flex: 1,
+    lineHeight: Typography.sizes.sm * 1.5,
+  },
+  button: {
+    margin: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: Typography.sizes.lg,
+    fontWeight: Typography.weights.bold,
   },
   modalOverlay: {
     flex: 1,
@@ -359,7 +322,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   datePickerContainer: {
-    backgroundColor: '#fff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingBottom: 34,
@@ -371,20 +333,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
   },
   datePickerTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#2D3748',
   },
   cancelButton: {
     fontSize: 17,
-    color: '#718096',
   },
   doneButton: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#4ECDC4',
   },
 });
