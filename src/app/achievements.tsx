@@ -254,6 +254,26 @@ export default function AchievementsScreen() {
           </Text>
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={[
+            styles.filterTab,
+            filter === 'mindful' && styles.filterTabActive,
+            {
+              backgroundColor: filter === 'mindful' ? colors.primary : colors.card,
+              borderColor: colors.cardBorder,
+            }
+          ]}
+          onPress={() => setFilter('mindful')}
+        >
+          <Ionicons name="leaf" size={14} color={filter === 'mindful' ? '#FFF' : colors.text} />
+          <Text style={[
+            styles.filterTabText,
+            { color: filter === 'mindful' ? '#FFF' : colors.text }
+          ]}>
+            Farkındalık
+          </Text>
+        </TouchableOpacity>
+
         {available.some((a) => a.category === 'gradual') && (
         <TouchableOpacity
           style={[

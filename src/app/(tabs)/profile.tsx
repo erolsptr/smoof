@@ -8,8 +8,12 @@ import { useProgress } from '@/hooks/useProgress';
 import { useUserStore } from '@/store/userStore';
 import { useStatsStore } from '@/store/statsStore';
 import { useAchievementStore } from '@/store/achievementStore';
+import { useCheckInStore } from '@/store/checkInStore';
+import { moodEmoji } from '@/constants/checkIn';
+import Constants from 'expo-constants';
+import { useThemeStore } from '@/store/themeStore';
+import { resetAllData } from '@/utils/resetApp';
 import { ACHIEVEMENTS } from '@/constants/achievements';
-import { storage } from '@/utils/storage';
 import { getDateString, getQuitTimestamp, getTodayString, toDateKey } from '@/utils/dateHelpers';
 import { getActivePlan, getCurrentGradualTarget, getGradualZeroDate, getTrackingStartDate } from '@/utils/gradualHelpers';
 import { getAchievementProgress, isAchievementVisible } from '@/utils/progressMetrics';
@@ -53,15 +57,16 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { profile, gradual, isGradual, isPreparation, achievementContext } = useProgress();
   const updateProfile = useUserStore((s) => s.updateProfile);
-  const clearUserData = useUserStore((s) => s.clearUserData);
   const currentStreak = useStatsStore((s) => s.currentStreak);
   const smokeFreeStreak = useStatsStore((s) => s.smokeFreeStreak);
-  const clearStatsData = useStatsStore((s) => s.clearStatsData);
   const syncStreaks = useStatsStore((s) => s.syncStreaks);
   const unlockedIds = useAchievementStore((s) => s.unlockedAchievements);
-  const resetAchievements = useAchievementStore((s) => s.resetAchievements);
 
   const offsetDays = useClockStore((s) => s.offsetDays);
+  const themePreference = useThemeStore((s) => s.preference);
+  const setThemePreference = useThemeStore((s) => s.setPreference);
+  const appVersion = Constants.expoConfig?.version ?? '1.0.0';
+  const todayCheckIn = useCheckInStore((s) => s.checkIns.find((c) => c.date === getTodayString()));
   const setOffsetDays = useClockStore((s) => s.setOffsetDays);
 
   const [testModeVisible, setTestModeVisible] = useState(false);
@@ -144,15 +149,45 @@ export default function ProfileScreen() {
           text: 'Sıfırla',
           style: 'destructive',
           onPress: async () => {
-            await clearUserData();
-            await clearStatsData();
-            await resetAchievements();
-            await storage.clear();
-            await setOffsetDays(0);
+            await resetAllData();
             router.replace('/onboarding');
           },
         },
       ],
+    );
+  };
+
+  // Settings → "Tüm verilerimi sil": asks twice, it can't be undone
+  const handleDeleteAllData = () => {
+    Alert.alert(
+      'Tüm verilerini sil',
+      'Profilin, günlük girişlerin, check-in’lerin, rozetlerin ve tüm ilerlemen bu telefondan silinecek.',
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Devam et',
+          style: 'destructive',
+          onPress: () =>
+            Alert.alert('Emin misin?', 'Bu işlem geri alınamaz. Uygulama ilk açıldığı haline döner.', [
+              { text: 'Vazgeç', style: 'cancel' },
+              {
+                text: 'Evet, hepsini sil',
+                style: 'destructive',
+                onPress: async () => {
+                  await resetAllData();
+                  router.replace('/onboarding');
+                },
+              },
+            ]),
+        },
+      ],
+    );
+  };
+
+  const showPrivacy = () => {
+    Alert.alert(
+      'Verilerin sende 🔒',
+      'Sigara girişlerin, ruh halin, check-in’lerin ve ilerlemen sadece bu telefonda saklanır. Bir hesaba bağlı değildir ve hiçbir sunucuya gönderilmez.\n\nUygulamayı silersen ya da “Tüm verilerimi sil”i kullanırsan hepsi kalıcı olarak silinir.',
     );
   };
 
@@ -199,6 +234,9 @@ export default function ProfileScreen() {
             <Ionicons name="color-palette" size={18} color="#FFF" />
           </TouchableOpacity>
         </View>
+        <TouchableOpacity onPress={() => router.push('/avatar')} hitSlop={8}>
+          <Text style={[styles.editAvatarLink, { color: colors.primary }]}>Smoof’unu düzenle</Text>
+        </TouchableOpacity>
         <Text style={[styles.name, { color: colors.text }]}>Profilim</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
         <View style={[styles.methodChip, { backgroundColor: colors.primary + '18' }]}>
@@ -207,6 +245,38 @@ export default function ProfileScreen() {
             {isGradual ? `Kademeli azaltma · ${getActivePlan(profile).weeks} hafta` : 'Hemen bırakma'}
           </Text>
         </View>
+      </View>
+
+      {/* Daily tracking: today's check-in + weekly summary */}
+      <View style={[styles.card, styles.listCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+        <TouchableOpacity style={styles.infoRow} onPress={() => router.push('/check-in')}>
+          <View style={[styles.infoIcon, { backgroundColor: colors.primary + '18' }]}>
+            {todayCheckIn ? (
+              <Text style={styles.moodIcon}>{moodEmoji(todayCheckIn.mood)}</Text>
+            ) : (
+              <Ionicons name="happy" size={18} color={colors.primary} />
+            )}
+          </View>
+          <View style={styles.infoText}>
+            <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Günlük check-in</Text>
+            <Text style={[styles.infoValue, { color: colors.text }]}>
+              {todayCheckIn ? 'Bugün dolduruldu ✓' : 'Bugün nasılsın?'}
+            </Text>
+          </View>
+          {!todayCheckIn && <Text style={[styles.checkInState, { color: colors.primary }]}>Doldur</Text>}
+          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+        </TouchableOpacity>
+        <Divider />
+        <TouchableOpacity style={styles.infoRow} onPress={() => router.push('/weekly')}>
+          <View style={[styles.infoIcon, { backgroundColor: colors.secondary + '18' }]}>
+            <Ionicons name="stats-chart" size={18} color={colors.secondary} />
+          </View>
+          <View style={styles.infoText}>
+            <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Son 7 gün, keşifler, haftanın hedefi</Text>
+            <Text style={[styles.infoValue, { color: colors.text }]}>Haftalık özetim</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+        </TouchableOpacity>
       </View>
 
       {/* Badges */}
@@ -341,20 +411,59 @@ export default function ProfileScreen() {
       {/* Settings */}
       <Text style={[styles.sectionTitle, { color: colors.text }]}>Ayarlar</Text>
       <View style={[styles.card, styles.listCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-        <TouchableOpacity style={styles.infoRow} onPress={() => router.push('/avatar')}>
-          <View style={[styles.infoIcon, { backgroundColor: colors.primary + '18' }]}>
-            <Ionicons name="color-palette" size={18} color={colors.primary} />
-          </View>
-          <Text style={[styles.settingLabel, { color: colors.text }]}>Smoof’umu düzenle</Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-        </TouchableOpacity>
-        <Divider />
         <TouchableOpacity style={styles.infoRow} onPress={() => router.push('/settings/notifications')}>
           <View style={[styles.infoIcon, { backgroundColor: colors.textSecondary + '18' }]}>
             <Ionicons name="notifications" size={18} color={colors.textSecondary} />
           </View>
           <Text style={[styles.settingLabel, { color: colors.text }]}>Bildirimler</Text>
           <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+        </TouchableOpacity>
+        <Divider />
+        {/* Appearance */}
+        <View style={styles.infoRow}>
+          <View style={[styles.infoIcon, { backgroundColor: colors.textSecondary + '18' }]}>
+            <Ionicons name="contrast" size={18} color={colors.textSecondary} />
+          </View>
+          <Text style={[styles.settingLabel, { color: colors.text }]}>Görünüm</Text>
+          <View style={[styles.segment, { backgroundColor: colors.background, borderColor: colors.cardBorder }]}>
+            {([['system', 'Sistem'], ['light', 'Açık'], ['dark', 'Koyu']] as const).map(([value, label]) => {
+              const selected = themePreference === value;
+              return (
+                <TouchableOpacity
+                  key={value}
+                  style={[styles.segmentItem, selected && { backgroundColor: colors.primary }]}
+                  onPress={() => setThemePreference(value)}
+                  accessibilityLabel={`Görünüm: ${label}`}
+                >
+                  <Text style={[styles.segmentText, { color: selected ? '#FFF' : colors.textSecondary }]}>{label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+        <Divider />
+        <TouchableOpacity style={styles.infoRow} onPress={showPrivacy}>
+          <View style={[styles.infoIcon, { backgroundColor: colors.textSecondary + '18' }]}>
+            <Ionicons name="lock-closed" size={18} color={colors.textSecondary} />
+          </View>
+          <Text style={[styles.settingLabel, { color: colors.text }]}>Gizlilik</Text>
+          <Text style={[styles.settingValue, { color: colors.textTertiary }]}>Veriler sadece bu telefonda</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+        </TouchableOpacity>
+        <Divider />
+        <View style={styles.infoRow}>
+          <View style={[styles.infoIcon, { backgroundColor: colors.textSecondary + '18' }]}>
+            <Ionicons name="information-circle" size={18} color={colors.textSecondary} />
+          </View>
+          <Text style={[styles.settingLabel, { color: colors.text }]}>Sürüm</Text>
+          <Text style={[styles.settingValue, { color: colors.textTertiary }]}>{appVersion}</Text>
+        </View>
+        <Divider />
+        <TouchableOpacity style={styles.infoRow} onPress={handleDeleteAllData}>
+          <View style={[styles.infoIcon, { backgroundColor: colors.error + '18' }]}>
+            <Ionicons name="trash" size={18} color={colors.error} />
+          </View>
+          <Text style={[styles.settingLabel, { color: colors.error }]}>Tüm verilerimi sil</Text>
         </TouchableOpacity>
       </View>
 
@@ -452,7 +561,7 @@ export default function ProfileScreen() {
         </View>
       )}
 
-      <Text style={[styles.footer, { color: colors.textTertiary }]}>Smoof v1.0.0 · Made with 💚</Text>
+      <Text style={[styles.footer, { color: colors.textTertiary }]}>Smoof v{appVersion} · Made with 💚</Text>
 
       {/* Editors */}
       <EditValueModal
@@ -506,6 +615,38 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  moodIcon: {
+    fontSize: 18,
+  },
+  editAvatarLink: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 10,
+  },
+  settingValue: {
+    fontSize: 13,
+    marginRight: 4,
+  },
+  segment: {
+    flexDirection: 'row',
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 2,
+  },
+  segmentItem: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+  },
+  segmentText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  checkInState: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginRight: 4,
+  },
   changeLink: {
     fontSize: 14,
     fontWeight: '700',

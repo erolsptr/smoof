@@ -276,6 +276,10 @@ export interface AchievementContext {
   cravingsResisted: number;
   bestReductionPercent: number;
   hasZeroDay: boolean;
+  /** Daily check-ins: total, consecutive days, any day with no craving */
+  checkInCount: number;
+  checkInStreak: number;
+  hasCalmDay: boolean;
 }
 
 /** Health badges are based on real elapsed smoke-free time */
@@ -307,6 +311,10 @@ function getAchievementValue(a: Achievement, ctx: AchievementContext): { value: 
       return { value: ctx.minutesSmokeFree, goal: HEALTH_BADGE_MINUTES[a.id] ?? a.requirement * MINUTES_PER_DAY };
     case 'savings':
       return { value: ctx.moneySaved, goal: a.requirement };
+    case 'mindful':
+      if (a.id === 'checkin_calm') return { value: ctx.hasCalmDay ? 1 : 0, goal: 1 };
+      if (a.id === 'checkin_streak_7') return { value: ctx.checkInStreak, goal: a.requirement };
+      return { value: ctx.checkInCount, goal: a.requirement };
     case 'resistance':
       return a.id.startsWith('crisis_')
         ? { value: ctx.cravingsResisted, goal: a.requirement }

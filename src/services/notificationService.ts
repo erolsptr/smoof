@@ -284,6 +284,125 @@ export async function scheduleEveningReflection(hour: number = 21) {
   });
 }
 
+const CHECK_IN_PREFIX = 'check-in-';
+const CHECK_IN_MESSAGES = [
+  { title: 'Bugün nasıl geçti? 🦎', body: 'Smoof merak ediyor. 30 saniyelik check-in, sana özel öneriler.' },
+  { title: 'Bir dakikan var mı? 💚', body: 'Bugün nasıl hissettiğini anlat, yarın için birlikte plan yapalım.' },
+  { title: 'Günün nasıldı? 🌙', body: 'Seni neyin zorladığını bilirsem daha iyi yardım edebilirim.' },
+];
+
+/**
+ * Daily check-in reminders: one-off notifications for the next 3 evenings,
+ * skipping today when the check-in is already done. Called again on every app
+ * start and after each check-in, so it never asks twice the same day.
+ */
+export async function scheduleCheckInReminders(hour: number, minute: number, doneToday: boolean) {
+  await cancelCheckInReminders();
+  // Real time on purpose: notifications fire on the device clock
+  const now = new Date();
+  for (let day = 0; day < 3; day++) {
+    if (day === 0 && doneToday) continue;
+    const date = new Date(now);
+    date.setDate(now.getDate() + day);
+    date.setHours(hour, minute, 0, 0);
+    if (date <= now) continue;
+    const message = CHECK_IN_MESSAGES[date.getDate() % CHECK_IN_MESSAGES.length];
+    await Notifications.scheduleNotificationAsync({
+      identifier: `${CHECK_IN_PREFIX}${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`,
+      content: { ...message, data: { type: 'check_in', url: '/check-in' } },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date },
+    });
+  }
+}
+
+export async function cancelCheckInReminders() {
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  await Promise.all(
+    scheduled
+      // Also the old repeating "evening reflection", replaced by the check-in reminder
+      .filter((n) => n.identifier.startsWith(CHECK_IN_PREFIX) || n.content.data?.type === 'evening_reflection')
+      .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
+  );
+}
+
+const RISK_PREFIX = 'risk-';
+const WEEKLY_SUMMARY_ID = 'weekly-summary';
+const WEEKDAY_NAMES = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+const RISK_TIPS = [
+  'Şimdiden bir bardak su al ya da kısa bir yürüyüş planla 💪',
+  'Gelirse 3 uzun nefes, sonra karar ver. Geçecek 🌊',
+  'Elini meşgul edecek bir şey hazırla, istek dalgası kısa sürer ✋',
+];
+
+async function cancelByFilter(match: (n: Notifications.NotificationRequest) => boolean) {
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  await Promise.all(scheduled.filter(match).map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)));
+}
+
+/**
+ * Support before the user's risky times.
+ * - learnedHours: hours the user often had cravings → a personal note 15 min before
+ * - otherwise fallbackHours: the generic critical-hour messages
+ * - hardWeekday (0 = Sunday): one gentle note at 17:30 on that day each week
+ */
+export async function scheduleRiskReminders(learnedHours: number[], fallbackHours: number[], hardWeekday: number | null) {
+  await cancelRiskReminders();
+
+  if (learnedHours.length > 0) {
+    for (const [i, hour] of learnedHours.entries()) {
+      const at = hour === 0 ? { hour: 23, minute: 45 } : { hour: hour - 1, minute: 45 };
+      await Notifications.scheduleNotificationAsync({
+        identifier: `${RISK_PREFIX}hour-${hour}`,
+        content: {
+          title: `Saat ${String(hour).padStart(2, '0')}:00 yaklaşıyor 🦎`,
+          body: `Genelde bu saatlerde zorlanıyorsun. ${RISK_TIPS[i % RISK_TIPS.length]}`,
+          data: { type: 'risk_hour', url: '/crisis' },
+        },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, ...at },
+      });
+    }
+  } else if (fallbackHours.length > 0) {
+    await scheduleCriticalHourSupport(fallbackHours);
+  }
+
+  if (hardWeekday !== null) {
+    await Notifications.scheduleNotificationAsync({
+      identifier: `${RISK_PREFIX}weekday`,
+      content: {
+        title: `${WEEKDAY_NAMES[hardWeekday]} akşamı 💚`,
+        body: `${WEEKDAY_NAMES[hardWeekday]} günleri senin için daha zor geçebiliyor. Bu akşam için küçük bir planın var mı?`,
+        data: { type: 'risk_weekday', url: '/crisis' },
+      },
+      // Expo weekdays start at 1 = Sunday
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.WEEKLY, weekday: hardWeekday + 1, hour: 17, minute: 30 },
+    });
+  }
+}
+
+export async function cancelRiskReminders() {
+  await cancelByFilter(
+    (n) => n.identifier.startsWith(RISK_PREFIX) || n.content.data?.type === 'critical_hour',
+  );
+}
+
+/** Sunday 19:00: "your weekly summary is ready" */
+export async function scheduleWeeklySummaryReminder() {
+  await cancelWeeklySummaryReminder();
+  await Notifications.scheduleNotificationAsync({
+    identifier: WEEKLY_SUMMARY_ID,
+    content: {
+      title: 'Haftalık özetin hazır 📊',
+      body: 'Haftan nasıl geçti, neler öğrendim ve gelecek haftanın küçük hedefi seni bekliyor.',
+      data: { type: 'weekly_summary', url: '/weekly' },
+    },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.WEEKLY, weekday: 1, hour: 19, minute: 0 },
+  });
+}
+
+export async function cancelWeeklySummaryReminder() {
+  await cancelByFilter((n) => n.identifier === WEEKLY_SUMMARY_ID);
+}
+
 /**
  * Get all scheduled notifications (for debugging)
  */

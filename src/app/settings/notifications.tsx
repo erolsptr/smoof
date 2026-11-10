@@ -2,6 +2,9 @@ import { View, Text, StyleSheet, ScrollView, Switch, TouchableOpacity, Alert, Pl
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useNotificationStore } from '@/store/notificationStore';
+import { useStatsStore } from '@/store/statsStore';
+import { useCheckInStore } from '@/store/checkInStore';
+import { getRiskWindows, WEEKDAYS } from '@/utils/insights';
 import { Spacing, Typography, BorderRadius } from '@/constants';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
@@ -60,7 +63,7 @@ export default function NotificationSettingsScreen() {
   const handleEditTime = (type: 'motivation' | 'reflection') => {
     Alert.alert(
       'Saat Ayarla',
-      type === 'motivation' ? 'Günlük motivasyon saati' : 'Akşam değerlendirme saati',
+      type === 'motivation' ? 'Günlük motivasyon saati' : 'Check-in hatırlatma saati',
       [
         { text: 'İptal', style: 'cancel' },
         {
@@ -74,20 +77,19 @@ export default function NotificationSettingsScreen() {
     );
   };
 
+  // Risky hours learned from the user's craving logs (falls back to fixed hours)
+  const risk = getRiskWindows(useStatsStore.getState().crisisLogs, useCheckInStore.getState().checkIns);
+  const learnedText = risk.hours.length
+    ? `Öğrendim: ${risk.hours.map((h) => `${String(h).padStart(2, '0')}:00`).join(', ')}${risk.hardWeekday !== null ? ` · ${WEEKDAYS[risk.hardWeekday]}` : ''}`
+    : `Öğreniyorum · şimdilik ${settings.criticalHoursList.length} sabit saat`;
+
   const handleEditCriticalHours = () => {
     Alert.alert(
-      'Kritik Saatler',
-      'Genelde sigara içtiğin saatleri seç',
-      [
-        { text: 'İptal', style: 'cancel' },
-        {
-          text: 'Düzenle',
-          onPress: () => {
-            // TODO: Multi-select time picker
-            Alert.alert('Geliştirme Aşamasında', 'Saat seçici yakında eklenecek');
-          },
-        },
-      ]
+      'Zor anlar',
+      risk.hours.length
+        ? `“Canın sigara mı çekti?” kayıtlarına göre en çok ${risk.hours.map((h) => `${h}:00`).join(' ve ')} civarı zorlanıyorsun. Bu saatlerden 15 dakika önce kısa bir destek mesajı gönderiyorum.`
+        : 'Canın sigara çektiğinde kriz ekranını kullandıkça hangi saatlerde zorlandığını öğrenirim ve o saatlerden hemen önce destek mesajı gönderirim. Şimdilik genel saatleri kullanıyorum.',
+      [{ text: 'Tamam' }]
     );
   };
 
@@ -252,10 +254,10 @@ export default function NotificationSettingsScreen() {
                   <Ionicons name="alert-circle" size={20} color={colors.textSecondary} />
                   <View style={styles.settingText}>
                     <Text style={[styles.settingLabel, { color: colors.text }]}>
-                      Kritik Saatler
+                      Zor anlarda destek
                     </Text>
                     <Text style={[styles.settingDesc, { color: colors.textSecondary }]}>
-                      {settings.criticalHoursList.length} saat seçildi
+                      {learnedText}
                     </Text>
                   </View>
                 </View>
@@ -306,10 +308,10 @@ export default function NotificationSettingsScreen() {
                   <Ionicons name="moon" size={20} color={colors.textSecondary} />
                   <View style={styles.settingText}>
                     <Text style={[styles.settingLabel, { color: colors.text }]}>
-                      Akşam Değerlendirmesi
+                      Günlük check-in hatırlatıcısı
                     </Text>
                     <Text style={[styles.settingTime, { color: colors.textSecondary }]}>
-                      {`${settings.eveningReflectionTime.hour.toString().padStart(2, '0')}:${settings.eveningReflectionTime.minute.toString().padStart(2, '0')}`}
+                      {`${settings.eveningReflectionTime.hour.toString().padStart(2, '0')}:${settings.eveningReflectionTime.minute.toString().padStart(2, '0')} · sadece doldurmadığın günler`}
                     </Text>
                   </View>
                 </View>

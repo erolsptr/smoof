@@ -13,6 +13,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Smoof } from '@/components/smoof/Smoof';
 import { ChameleonHide } from '@/components/games/ChameleonHide';
+import { useCheckInStore } from '@/store/checkInStore';
+import { getCrisisInsight } from '@/utils/insights';
 import { SmokeGarden } from '@/components/games/SmokeGarden';
 import { BreathingGuide } from '@/components/crisis/BreathingGuide';
 import { CravingTimer } from '@/components/crisis/CravingTimer';
@@ -157,7 +159,10 @@ export default function CrisisScreen() {
   };
   
   // Motivational message (static, doesn't change)
+  // Personal line when Smoof knows what usually makes it hard, otherwise a general one
   const [motivationMessage] = useState(() => {
+    const personal = getCrisisInsight(useCheckInStore.getState().checkIns, useStatsStore.getState().crisisLogs);
+    if (personal) return personal;
     const messages = [
       "İstek sadece 5 dakika sürer. Sen daha güçlüsün! 💪",
       "Düşün: Şu ana kadar ne kadar yol kat ettin! 🌟",

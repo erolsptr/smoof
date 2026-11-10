@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useUserStore } from '@/store/userStore';
 import { useStatsStore } from '@/store/statsStore';
 import { useClockStore } from '@/utils/clock';
+import { useCheckInStore } from '@/store/checkInStore';
+import { useInsightStore } from '@/store/insightStore';
 import { Smoof } from '@/components/smoof/Smoof';
 
 // Loading screen colors (fixed, so it looks the same in light and dark mode)
@@ -30,6 +32,8 @@ export default function IndexScreen() {
         loadUserData(),
         loadStatsData(),
         useClockStore.getState().loadClock(),
+        useCheckInStore.getState().loadCheckIns(),
+        useInsightStore.getState().loadInsights(),
         new Promise((resolve) => setTimeout(resolve, MIN_SPLASH_MS)),
       ]);
 

@@ -292,6 +292,44 @@ export const ACHIEVEMENTS: Achievement[] = [
     category: 'gradual',
     requirement: 0, // Special: reached 0
   },
+
+  // MINDFUL (daily check-in) ACHIEVEMENTS
+  {
+    id: 'checkin_first',
+    title: 'Kendini Dinledin',
+    description: 'İlk günlük check-in',
+    icon: 'chatbubble-ellipses',
+    iconColor: '#14B8A6',
+    category: 'mindful',
+    requirement: 1,
+  },
+  {
+    id: 'checkin_calm',
+    title: 'Sakin Gün',
+    description: 'İlk kez hiç sigara isteği duymadığın bir gün',
+    icon: 'leaf',
+    iconColor: '#22C55E',
+    category: 'mindful',
+    requirement: 1, // Special: a check-in with no craving
+  },
+  {
+    id: 'checkin_streak_7',
+    title: 'Bir Hafta Farkındalık',
+    description: '7 gün üst üste check-in',
+    icon: 'calendar-number',
+    iconColor: '#8B5CF6',
+    category: 'mindful',
+    requirement: 7,
+  },
+  {
+    id: 'checkin_30',
+    title: 'Kendini Tanıyorsun',
+    description: 'Toplam 30 check-in',
+    icon: 'sparkles',
+    iconColor: '#F59E0B',
+    category: 'mindful',
+    requirement: 30,
+  },
 ];
 
 /**

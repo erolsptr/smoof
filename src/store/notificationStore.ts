@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { storage, STORAGE_KEYS } from '@/utils/storage';
+import * as Notifications from 'expo-notifications';
 import * as NotificationService from '@/services/notificationService';
+import { useCheckInStore } from '@/store/checkInStore';
+import { getTodayString } from '@/utils/dateHelpers';
+import { useStatsStore } from '@/store/statsStore';
+import { getRiskWindows } from '@/utils/insights';
 
 /**
  * Notification settings and preferences
@@ -32,6 +37,10 @@ interface NotificationState {
   toggleNotifications: (enabled: boolean) => Promise<void>;
   rescheduleAll: () => Promise<void>;
   loadSettings: () => Promise<void>;
+  /** (Re)schedule the evening check-in reminder and the weekly summary; never asks for permission */
+  syncCheckInReminders: () => Promise<void>;
+  /** (Re)schedule support before risky times, learned from the user's data */
+  syncRiskReminders: () => Promise<void>;
 }
 
 const DEFAULT_SETTINGS: NotificationSettings = {
@@ -119,18 +128,52 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       );
     }
     
-    if (settings.criticalHours && settings.criticalHoursList.length > 0) {
-      await NotificationService.scheduleCriticalHourSupport(settings.criticalHoursList);
-    }
+    await get().syncRiskReminders();
     
     if (settings.waterReminders) {
       await NotificationService.scheduleWaterReminders();
     }
     
-    if (settings.eveningReflection) {
-      await NotificationService.scheduleEveningReflection(
-        settings.eveningReflectionTime.hour
+    await get().syncCheckInReminders();
+  },
+
+  syncCheckInReminders: async () => {
+    try {
+      const { settings } = get();
+      const { status } = await Notifications.getPermissionsAsync();
+      if (!settings.enabled || !settings.eveningReflection || status !== 'granted') {
+        await NotificationService.cancelCheckInReminders();
+        await NotificationService.cancelWeeklySummaryReminder();
+        return;
+      }
+      await NotificationService.scheduleWeeklySummaryReminder();
+      const today = getTodayString();
+      const doneToday = useCheckInStore.getState().checkIns.some((c) => c.date === today);
+      await NotificationService.scheduleCheckInReminders(
+        settings.eveningReflectionTime.hour,
+        settings.eveningReflectionTime.minute,
+        doneToday,
       );
+    } catch (error) {
+      console.error('Failed to schedule check-in reminders:', error);
+    }
+  },
+
+  syncRiskReminders: async () => {
+    try {
+      const { settings } = get();
+      const { status } = await Notifications.getPermissionsAsync();
+      if (!settings.enabled || !settings.criticalHours || status !== 'granted') {
+        await NotificationService.cancelRiskReminders();
+        return;
+      }
+      const { hours, hardWeekday } = getRiskWindows(
+        useStatsStore.getState().crisisLogs,
+        useCheckInStore.getState().checkIns,
+      );
+      await NotificationService.scheduleRiskReminders(hours, settings.criticalHoursList, hardWeekday);
+    } catch (error) {
+      console.error('Failed to schedule risk reminders:', error);
     }
   },
   

@@ -4,6 +4,15 @@
 
 export type QuitMethod = 'immediate' | 'gradual';
 
+/** Daily check-in: how the day went (one per local day, optional) */
+export interface DailyCheckIn {
+  date: string; // local date key (YYYY-MM-DD)
+  mood: 1 | 2 | 3 | 4 | 5; // 1 = very bad … 5 = great
+  craving: 0 | 1 | 2 | 3; // none, light, medium, strong
+  triggers: string[]; // CHECK_IN_TRIGGERS ids
+  createdAt: string;
+}
+
 export interface GradualTargetChange {
   from: string; // local date key (YYYY-MM-DD)
   target: number; // daily limit from that day
@@ -80,7 +89,7 @@ export interface CrisisLog {
   method?: 'breathing' | 'minigame' | 'motivation'; // How did they cope?
 }
 
-export type AchievementCategory = 'streak' | 'savings' | 'health' | 'resistance' | 'gradual';
+export type AchievementCategory = 'streak' | 'savings' | 'health' | 'resistance' | 'gradual' | 'mindful';
 
 export interface Achievement {
   id: string;

@@ -7,10 +7,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useProgress } from '@/hooks/useProgress';
 import { useAchievementStore } from '@/store/achievementStore';
+import { useCheckInStore } from '@/store/checkInStore';
+import { useStatsStore } from '@/store/statsStore';
+import { moodEmoji, triggerLabel } from '@/constants/checkIn';
+import { topTrigger } from '@/utils/checkInAdvice';
+import { DISCOVERY_MIN_CHECKINS, getDiscoveries } from '@/utils/insights';
 import { ACHIEVEMENTS } from '@/constants/achievements';
 import { isAchievementVisible, MINUTES_PER_CIGARETTE } from '@/utils/progressMetrics';
 import { formatDuration } from '@/utils/milestones';
-import { daysBetween, getQuitTimestamp, getTodayString, parseDateKey, toDateKey } from '@/utils/dateHelpers';
+import { addDays, daysBetween, getQuitTimestamp, getTodayString, parseDateKey, toDateKey } from '@/utils/dateHelpers';
 import { HealthTimeline } from '@/components/stats/HealthTimeline';
 import { WeekBarChart } from '@/components/stats/WeekBarChart';
 
@@ -82,6 +87,9 @@ export default function ProgressScreen() {
   const insets = useSafeAreaInsets();
   const { profile, immediate, gradual, cravings, isGradual, isPreparation } = useProgress();
   const unlockedIds = useAchievementStore((s) => s.unlockedAchievements);
+  const checkIns = useCheckInStore((s) => s.checkIns);
+  const dailyStats = useStatsStore((s) => s.dailyStats);
+  const crisisLogs = useStatsStore((s) => s.crisisLogs);
 
   if (!profile) {
     return <View style={[styles.container, { backgroundColor: colors.background }]} />;
@@ -108,6 +116,100 @@ export default function ProgressScreen() {
             <Row label="En sık tetikleyici" value={TRIGGER_LABELS[cravings.topTrigger] ?? cravings.topTrigger} />
           )}
         </>
+      )}
+    </Section>
+  );
+
+  // Daily check-ins of the last 7 days (today included)
+  const week = Array.from({ length: 7 }, (_, i) => addDays(todayKey, i - 6));
+  const weekCheckIns = checkIns.filter((c) => c.date >= week[0] && c.date <= todayKey);
+  const weekTrigger = topTrigger(weekCheckIns, 2);
+  const avgCraving = weekCheckIns.length
+    ? weekCheckIns.reduce((sum, c) => sum + c.craving, 0) / weekCheckIns.length
+    : null;
+  const checkInSection = (
+    <Section title="Son 7 gün nasıldın?" subtitle="Günlük check-in cevapların">
+      {!weekCheckIns.some((c) => c.date === todayKey) && (
+        <TouchableOpacity
+          style={[styles.checkInButton, { backgroundColor: colors.primary + '14', borderColor: colors.primary + '55' }]}
+          onPress={() => router.push('/check-in')}
+        >
+          <Ionicons name="happy-outline" size={18} color={colors.primary} />
+          <Text style={[styles.checkInButtonText, { color: colors.primary }]}>Bugünkü check-in&apos;i doldur</Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+        </TouchableOpacity>
+      )}
+      {weekCheckIns.length === 0 ? (
+        <TouchableOpacity onPress={() => router.push('/check-in')}>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            Henüz check-in yok. Ana sayfadaki “Bugün nasılsın?” kartından 30 saniyede doldurabilirsin.
+          </Text>
+        </TouchableOpacity>
+      ) : (
+        <>
+          <View style={styles.moodWeek}>
+            {week.map((date) => {
+              const c = weekCheckIns.find((x) => x.date === date);
+              return (
+                <View key={date} style={styles.moodDay}>
+                  <Text style={[styles.moodDayEmoji, !c && { opacity: 0.25 }]}>{c ? moodEmoji(c.mood) : '○'}</Text>
+                  <Text style={[styles.moodDayLabel, { color: colors.textTertiary }]}>
+                    {date === todayKey ? 'Bugün' : parseDateKey(date).toLocaleDateString('tr-TR', { weekday: 'short' })}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+          {avgCraving !== null && (
+            <Row
+              label="Ortalama sigara isteği"
+              value={avgCraving < 0.75 ? 'Çok az' : avgCraving < 1.5 ? 'Az' : avgCraving < 2.25 ? 'Orta' : 'Yüksek'}
+            />
+          )}
+          {weekTrigger && (
+            <Row label="En çok zorlayan" value={`${triggerLabel(weekTrigger.id)} · ${weekTrigger.count} gün`} />
+          )}
+          <TouchableOpacity style={styles.weeklyLink} onPress={() => router.push('/weekly')}>
+            <Text style={[styles.weeklyLinkText, { color: colors.primary }]}>Haftalık özetini gör</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+          </TouchableOpacity>
+        </>
+      )}
+    </Section>
+  );
+
+  // What Smoof learned from the check-ins (needs a couple of weeks of data)
+  const discoveries = getDiscoveries(profile, checkIns, dailyStats, crisisLogs);
+  const discoverySection = (
+    <Section title="Keşiflerin 🔎" subtitle="Check-in'lerinden öğrendiklerim">
+      {checkIns.length < DISCOVERY_MIN_CHECKINS ? (
+        <>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            {DISCOVERY_MIN_CHECKINS} check-in sonra seninle ilgili ilk keşiflerimi burada paylaşacağım.
+          </Text>
+          <View style={[styles.discoveryTrack, { backgroundColor: colors.cardBorder }]}>
+            <View
+              style={[
+                styles.discoveryFill,
+                { backgroundColor: colors.primary, width: `${Math.max(4, (checkIns.length / DISCOVERY_MIN_CHECKINS) * 100)}%` },
+              ]}
+            />
+          </View>
+          <Text style={[styles.discoveryCount, { color: colors.textTertiary }]}>
+            {checkIns.length}/{DISCOVERY_MIN_CHECKINS} check-in
+          </Text>
+        </>
+      ) : discoveries.length === 0 ? (
+        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+          Henüz belirgin bir örüntü yok. Bu da iyi haber: seni zorlayan tek bir şey öne çıkmıyor.
+        </Text>
+      ) : (
+        discoveries.map((d) => (
+          <View key={d.id} style={styles.discoveryRow}>
+            <Text style={styles.discoveryIcon}>{d.icon}</Text>
+            <Text style={[styles.discoveryText, { color: colors.textSecondary }]}>{d.text}</Text>
+          </View>
+        ))
       )}
     </Section>
   );
@@ -240,6 +342,8 @@ export default function ProgressScreen() {
           <HealthTimeline minutesSmokeFree={gradual.smokeFreeStreak * 24 * 60} />
         </Section>
 
+        {checkInSection}
+        {discoverySection}
         {cravingsSection}
         {badgesLink}
       </ScrollView>
@@ -299,6 +403,8 @@ export default function ProgressScreen() {
         <HealthTimeline minutesSmokeFree={immediate.minutesSmokeFree} />
       </Section>
 
+      {checkInSection}
+      {discoverySection}
       {cravingsSection}
       {badgesLink}
     </ScrollView>
@@ -430,6 +536,75 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  checkInButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  checkInButtonText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  weeklyLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+  },
+  weeklyLinkText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  discoveryTrack: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginTop: 10,
+  },
+  discoveryFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  discoveryCount: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  discoveryRow: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'flex-start',
+    paddingVertical: 4,
+  },
+  discoveryIcon: {
+    fontSize: 20,
+  },
+  discoveryText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  moodWeek: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  moodDay: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  moodDayEmoji: {
+    fontSize: 24,
+  },
+  moodDayLabel: {
+    fontSize: 10,
+    marginTop: 2,
   },
   badgesLink: {
     flexDirection: 'row',

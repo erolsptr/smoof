@@ -8,6 +8,8 @@ import { addDays, daysBetween, getQuitTimestamp, getTodayString, parseDateKey, t
 import { getActivePlan, getCurrentGradualTarget, getGradualSchedule, getGradualTargetForDate } from '@/utils/gradualHelpers';
 import { MonthCalendar, getUnloggedDays } from '@/components/MonthCalendar';
 import { CravingCard } from '@/components/CravingCard';
+import { CheckInCard } from '@/components/CheckInCard';
+import { InsightCards } from '@/components/InsightCards';
 import { FreezeBadge } from '@/components/FreezeBadge';
 import { HEALTH_MILESTONES, formatDuration, getNextHealthMilestone, getNextStreakMilestone } from '@/utils/milestones';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -316,39 +318,6 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Plan road map: next limit drop + first smoke-free day */}
-        {(() => {
-          const steps = getGradualSchedule(profile);
-          const zeroDate = steps[steps.length - 1]?.from;
-          const nextStep = steps.find((st) => st.from > todayKey);
-          const daysToNext = nextStep ? daysBetween(todayKey, nextStep.from) : 0;
-          return (
-            <TouchableOpacity
-              style={[styles.planCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
-              onPress={() => router.push('/plan')}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.planCardIcon, { backgroundColor: colors.primary + '18' }]}>
-                <Ionicons name="map" size={20} color={colors.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.planCardTitle, { color: colors.text }]}>Yol haritam</Text>
-                <Text style={[styles.planCardText, { color: colors.textSecondary }]} numberOfLines={2}>
-                  {nextStep
-                    ? nextStep.target === 0
-                      ? `${daysToNext === 1 ? 'Yarın' : `${daysToNext} gün sonra`} sigarasız başlıyorsun 🎉`
-                      : `${daysToNext === 1 ? 'Yarın' : `${daysToNext} gün sonra`} limit ${nextStep.target} sigara`
-                    : 'Plan tamam, her gün sigarasız 🎉'}
-                  {nextStep && zeroDate && nextStep.target !== 0
-                    ? ` · Sıfır: ${parseDateKey(zeroDate).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}`
-                    : ''}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-            </TouchableOpacity>
-          );
-        })()}
-
         {/* Craving help - the place to tap when a craving hits */}
         <CravingCard />
 
@@ -385,6 +354,45 @@ export default function HomeScreen() {
             Bir güne dokunarak içtiğin sigara sayısını girebilirsin
           </Text>
         </View>
+
+        {/* Daily check-in */}
+        <CheckInCard />
+
+        {/* Smoof's insights: weekly summary, plan suggestion */}
+        <InsightCards />
+
+        {/* Plan road map: next limit drop + first smoke-free day */}
+        {(() => {
+          const steps = getGradualSchedule(profile);
+          const zeroDate = steps[steps.length - 1]?.from;
+          const nextStep = steps.find((st) => st.from > todayKey);
+          const daysToNext = nextStep ? daysBetween(todayKey, nextStep.from) : 0;
+          return (
+            <TouchableOpacity
+              style={[styles.planCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+              onPress={() => router.push('/plan')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.planCardIcon, { backgroundColor: colors.primary + '18' }]}>
+                <Ionicons name="map" size={20} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.planCardTitle, { color: colors.text }]}>Yol haritam</Text>
+                <Text style={[styles.planCardText, { color: colors.textSecondary }]} numberOfLines={2}>
+                  {nextStep
+                    ? nextStep.target === 0
+                      ? `${daysToNext === 1 ? 'Yarın' : `${daysToNext} gün sonra`} sigarasız başlıyorsun 🎉`
+                      : `${daysToNext === 1 ? 'Yarın' : `${daysToNext} gün sonra`} limit ${nextStep.target} sigara`
+                    : 'Plan tamam, her gün sigarasız 🎉'}
+                  {nextStep && zeroDate && nextStep.target !== 0
+                    ? ` · Sıfır: ${parseDateKey(zeroDate).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}`
+                    : ''}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </TouchableOpacity>
+          );
+        })()}
       </ScrollView>
     );
   }
@@ -478,6 +486,12 @@ export default function HomeScreen() {
 
       {/* Craving help */}
       <CravingCard />
+
+      {/* Daily check-in */}
+      <CheckInCard />
+
+      {/* Smoof's insights: weekly summary, plan suggestion */}
+      <InsightCards />
 
       <Animated.View style={{ opacity: cardsOpacity, transform: [{ translateY: cardsTranslateY }] }}>
         {/* Gains */}
@@ -867,6 +881,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 16,
     borderWidth: 1,
+    marginBottom: 16,
   },
   calendarHint: {
     fontSize: 12,

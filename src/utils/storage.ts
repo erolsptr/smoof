@@ -53,4 +53,8 @@ export const STORAGE_KEYS = {
   GAME_BEST_HIDE: '@smoof:game_best_hide',
   GAME_BEST_HIDE_SCORE: '@smoof:game_best_hide_score',
   GAME_BEST_GARDEN: '@smoof:game_best_garden',
+  CHECK_INS: '@smoof:check_ins',
+  CHECK_IN_DISMISSED: '@smoof:check_in_dismissed',
+  INSIGHTS: '@smoof:insights',
+  THEME: '@smoof:theme',
 } as const;

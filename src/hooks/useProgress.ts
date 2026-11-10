@@ -11,6 +11,8 @@ import {
 } from '@/utils/progressMetrics';
 import { getTodayString, toDateKey } from '@/utils/dateHelpers';
 import { now as clockNow, useClockStore } from '@/utils/clock';
+import { useCheckInStore } from '@/store/checkInStore';
+import { getCheckInStats } from '@/utils/insights';
 
 const MINUTES_PER_DAY = 24 * 60;
 
@@ -23,6 +25,7 @@ export function useProgress() {
   const dailyStats = useStatsStore((s) => s.dailyStats);
   const crisisLogs = useStatsStore((s) => s.crisisLogs);
   const storeStreak = useStatsStore((s) => s.currentStreak);
+  const checkIns = useCheckInStore((s) => s.checkIns);
 
   const offsetDays = useClockStore((s) => s.offsetDays);
 
@@ -38,6 +41,8 @@ export function useProgress() {
   return useMemo(() => {
     const isGradual = profile?.quitMethod === 'gradual';
     const cravings = getCravingMetrics(crisisLogs);
+    const ciStats = getCheckInStats(checkIns);
+    const checkInBadges = { checkInCount: ciStats.count, checkInStreak: ciStats.streak, hasCalmDay: ciStats.hasCalmDay };
     const isPreparation = profile ? toDateKey(profile.quitDate) > getTodayString() : false;
 
     if (!profile) {
@@ -58,6 +63,7 @@ export function useProgress() {
         cravingsResisted: cravings.resisted,
         bestReductionPercent: gradual.bestReductionPercent,
         hasZeroDay: gradual.hasZeroDay,
+        ...checkInBadges,
       };
       return {
         profile, now, isGradual, isPreparation, cravings,
@@ -78,6 +84,7 @@ export function useProgress() {
       cravingsResisted: cravings.resisted,
       bestReductionPercent: 0,
       hasZeroDay: false,
+      ...checkInBadges,
     };
     return {
       profile, now, isGradual, isPreparation, cravings,
@@ -85,7 +92,7 @@ export function useProgress() {
       gradual: null,
       achievementContext,
     };
-  }, [profile, dailyStats, crisisLogs, storeStreak, now]);
+  }, [profile, dailyStats, crisisLogs, storeStreak, now, checkIns]);
 }
 
 /**
