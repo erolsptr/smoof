@@ -163,7 +163,7 @@ Profil ekranında Smoof'un fotoğrafına 5 kez dokununca gizli test modu açıl�
 
 ## Yol haritası
 
-- [ ] Uygulama ikonu ve açılış ekranı tasarımı
+- [x] Uygulama ikonu ve açılış ekranı tasarımı
 - [ ] Destek e-postası, destek ve gizlilik politikası sayfası
 - [ ] EAS ile mağaza derlemeleri (App Store, Google Play)
 

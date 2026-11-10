@@ -7,11 +7,6 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "scheme": "smoof",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#10B981"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.smoof.app"
@@ -32,13 +27,26 @@
     "plugins": [
       "expo-router",
       "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#10B981",
+          "dark": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#064E3B"
+          }
+        }
+      ],
       "expo-sqlite",
       "@react-native-community/datetimepicker",
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
-          "color": "#4ECDC4",
+          "icon": "./assets/notification-icon.png",
+          "color": "#10B981",
           "sounds": [],
           "mode": "production"
         }
